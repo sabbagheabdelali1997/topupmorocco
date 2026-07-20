@@ -120,8 +120,8 @@ html[lang="fr"] .pack{direction:ltr}
 }</script></head>
 <body>
 <header class="topbar"><a class="brand" href="/">TOPUP <span>MOROCCO</span></a><a class="top-btn" href="https://wa.me/212773125830" rel="noopener" target="_blank"><span data-ar="واتساب" data-fr="WhatsApp">واتساب</span></a><div aria-label="اختيار اللغة" class="language-switcher" id="languageSwitcher">
-<button class="active" data-lang="ar" type="button">العربية</button>
-<button data-lang="fr" type="button">Français</button>
+<button class="active" data-lang="ar" type="button">🇲🇦 العربية</button>
+<button data-lang="fr" type="button">🇫🇷 Français</button>
 </div></header>
 <main>
 <div class="wrap breadcrumb"><a href="/"><span data-ar="الرئيسية" data-fr="Accueil">الرئيسية</span></a><span data-ar="← شحن Free Fire" data-fr="← Recharge Free Fire">← شحن Free Fire</span></div>
@@ -142,10 +142,7 @@ html[lang="fr"] .pack{direction:ltr}
 <script>
 const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg"),playerId=document.getElementById("playerId");
 packs.addEventListener("click",e=>{const b=e.target.closest(".pack");if(!b)return;packs.querySelectorAll(".pack").forEach(x=>x.classList.remove("active"));b.classList.add("active");selected=b.dataset.value;msg.textContent=""});
-document.getElementById("order").addEventListener("click",()=>{const id=playerId.value.trim();if(!selected){msg.textContent="اختر الباقة أولًا.";return}if(!id){msg.textContent="أدخل ID اللاعب.";return}const text=`السلام عليكم، أريد طلب شحن Free Fire.
-
-🎁 الباقة: ${selected}
-🆔 ID اللاعب: ${id}`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
+document.getElementById("order").addEventListener("click",()=>{const id=playerId.value.trim();if(!selected){msg.textContent="اختر الباقة أولًا.";return}if(!id){msg.textContent="أدخل ID اللاعب.";return}const text=`السلام عليكم،\n\nالمنتج: \u2066شحن جواهر Free Fire\u2069\nالباقة: \u2066${selected}\u2069\nID اللاعب: \u2066${id}\u2069`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
 </script>
 <script id="bilingualScript">
 (()=>{
