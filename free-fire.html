@@ -40,25 +40,38 @@
  "seller":{"@type":"Organization","name":"TopUpMorocco","url":"https://topupmorocco.com/"}
 }
 </script>
+
+<style id="bilingualStyles">
+.language-switcher{display:flex;direction:ltr;gap:4px;padding:4px;border:1px solid #ffffff26;border-radius:12px;background:#091222;white-space:nowrap}
+.language-switcher button{border:0;border-radius:8px;padding:8px 10px;background:transparent;color:#bfc9db;font-weight:800;cursor:pointer}
+.language-switcher button.active{background:linear-gradient(135deg,#8b4cff,#6330d7);color:#fff}
+html[lang="fr"] body{direction:ltr}
+html[lang="fr"] .breadcrumb,html[lang="fr"] .copy,html[lang="fr"] .heading,html[lang="fr"] .panel,html[lang="fr"] .footer{text-align:left}
+html[lang="fr"] .pack{direction:ltr}
+@media(max-width:620px){.topbar{flex-wrap:wrap}.language-switcher{order:3;width:100%;justify-content:center}.language-switcher button{flex:1}}
+</style>
 </head>
 <body>
-<header class="topbar"><a class="brand" href="/">TOPUP <span>MOROCCO</span></a><a class="top-btn" href="https://wa.me/212773125830" rel="noopener" target="_blank">واتساب</a></header>
+<header class="topbar"><a class="brand" href="/">TOPUP <span>MOROCCO</span></a><a class="top-btn" href="https://wa.me/212773125830" rel="noopener" target="_blank"><span data-ar="واتساب" data-fr="WhatsApp">واتساب</span></a><div aria-label="اختيار اللغة" class="language-switcher" id="languageSwitcher">
+<button class="active" data-lang="ar" type="button">العربية</button>
+<button data-lang="fr" type="button">Français</button>
+</div></header>
 <main>
-<div class="wrap breadcrumb"><a href="/">الرئيسية</a> ← شحن Free Fire</div>
-<section class="hero"><div class="wrap"><div class="hero-card"><div class="copy"><span class="tag">FREE FIRE DIAMONDS</span><h1>Free Fire Diamonds</h1><p>اختر باقة الجواهر المناسبة، أدخل معرف اللاعب (Player ID)، ثم أرسل طلبك عبر واتساب. سيتم تنفيذ الشحن بعد تأكيد الدفع.</p></div><div aria-label="Free Fire Diamonds" class="visual"><img alt="Free Fire" class="product-art-page" src="free-fire.webp"/></div></div></div></section>
-<section class="section"><div class="wrap"><div class="heading"><em>الباقات المتاحة</em><h2>اختر باقة الجواهر</h2><p>السعر بالدرهم المغربي.</p></div><div class="order-panel"><div class="panel"><div class="packs" id="packs">
+<div class="wrap breadcrumb"><a href="/"><span data-ar="الرئيسية" data-fr="Accueil">الرئيسية</span></a><span data-ar="← شحن Free Fire" data-fr="← Recharge Free Fire">← شحن Free Fire</span></div>
+<section class="hero"><div class="wrap"><div class="hero-card"><div class="copy"><span class="tag">FREE FIRE DIAMONDS</span><h1>Free Fire Diamonds</h1><p><span data-ar="اختر باقة الجواهر المناسبة، أدخل معرف اللاعب (Player ID)، ثم أرسل طلبك عبر واتساب. سيتم تنفيذ الشحن بعد تأكيد الدفع." data-fr="Choisissez le pack de diamants, saisissez l’identifiant du joueur (Player ID), puis envoyez votre commande via WhatsApp. La recharge sera effectuée après confirmation du paiement.">اختر باقة الجواهر المناسبة، أدخل معرف اللاعب (Player ID)، ثم أرسل طلبك عبر واتساب. سيتم تنفيذ الشحن بعد تأكيد الدفع.</span></p></div><div aria-label="Free Fire Diamonds" class="visual"><img alt="Free Fire" class="product-art-page" src="free-fire.webp"/></div></div></div></section>
+<section class="section"><div class="wrap"><div class="heading"><em><span data-ar="الباقات المتاحة" data-fr="Packs disponibles">الباقات المتاحة</span></em><h2><span data-ar="اختر باقة الجواهر" data-fr="Choisissez le pack de diamants">اختر باقة الجواهر</span></h2><p><span data-ar="السعر بالدرهم المغربي." data-fr="Prix en dirhams marocains.">السعر بالدرهم المغربي.</span></p></div><div class="order-panel"><div class="panel"><div class="packs" id="packs">
 <button class="pack" data-value="110 💎 — 13 DH" type="button"><b>110 💎</b><span>13 DH</span></button>
 <button class="pack" data-value="231 💎 — 25 DH" type="button"><b>231 💎</b><span>25 DH</span></button>
 <button class="pack" data-value="341 💎 — 36 DH" type="button"><b>341 💎</b><span>36 DH</span></button>
 <button class="pack" data-value="583 💎 — 56 DH" type="button"><b>583 💎</b><span>56 DH</span></button>
 <button class="pack" data-value="1188 💎 — 109 DH" type="button"><b>1188 💎</b><span>109 DH</span></button>
 <button class="pack" data-value="2420 💎 — 209 DH" type="button"><b>2420 💎</b><span>209 DH</span></button>
-</div><div class="bulk"><span>ⓘ</span><div><strong>خصومات خاصة للطلبات الكبيرة.</strong> تواصل معنا عبر واتساب للحصول على أفضل الأسعار.</div></div></div>
-<aside class="panel"><div class="form"><label for="playerId">ID اللاعب</label><input autocomplete="off" id="playerId" inputmode="numeric" placeholder="أدخل ID اللاعب"/><button class="order" id="order">اطلب عبر واتساب</button><p class="msg" id="msg"></p><p class="note">سيتم فتح واتساب برسالة جاهزة تتضمن الباقة وID اللاعب.</p></div><ul class="features"><li>⚡ إرسال الطلب بخطوات قليلة</li><li>🛡️ مراجعة البيانات قبل تنفيذ الشحن</li><li>💬 متابعة الطلب مباشرة عبر واتساب</li></ul></aside></div>
-<div class="payments"><div class="heading"><em>طرق الدفع</em></div><div class="pay-list"><span>CIH Bank</span><span>Attijariwafa Bank</span><span>Cash Plus</span><span>Orange Money</span><span>Inwi Money</span><span>PayPal</span></div></div>
+</div><div class="bulk"><span>ⓘ</span><div><strong><span data-ar="خصومات خاصة للطلبات الكبيرة." data-fr="Réductions spéciales pour les grosses commandes.">خصومات خاصة للطلبات الكبيرة.</span></strong><span data-ar="تواصل معنا عبر واتساب للحصول على أفضل الأسعار." data-fr="Contactez-nous via WhatsApp pour obtenir les meilleurs prix.">تواصل معنا عبر واتساب للحصول على أفضل الأسعار.</span></div></div></div>
+<aside class="panel"><div class="form"><label for="playerId"><span data-ar="ID اللاعب" data-fr="ID du joueur">ID اللاعب</span></label><input autocomplete="off" id="playerId" inputmode="numeric" placeholder="أدخل ID اللاعب"/><button class="order" id="order"><span data-ar="اطلب عبر واتساب" data-fr="Commander via WhatsApp">اطلب عبر واتساب</span></button><p class="msg" id="msg"></p><p class="note"><span data-ar="سيتم فتح واتساب برسالة جاهزة تتضمن الباقة وID اللاعب." data-fr="WhatsApp s’ouvrira avec un message contenant le pack et l’ID du joueur.">سيتم فتح واتساب برسالة جاهزة تتضمن الباقة وID اللاعب.</span></p></div><ul class="features"><li><span data-ar="⚡ إرسال الطلب بخطوات قليلة" data-fr="⚡ Commande en quelques étapes">⚡ إرسال الطلب بخطوات قليلة</span></li><li><span data-ar="🛡️ مراجعة البيانات قبل تنفيذ الشحن" data-fr="🛡️ Vérification des données avant la recharge">🛡️ مراجعة البيانات قبل تنفيذ الشحن</span></li><li><span data-ar="💬 متابعة الطلب مباشرة عبر واتساب" data-fr="💬 Suivi direct de la commande via WhatsApp">💬 متابعة الطلب مباشرة عبر واتساب</span></li></ul></aside></div>
+<div class="payments"><div class="heading"><em><span data-ar="طرق الدفع" data-fr="Moyens de paiement">طرق الدفع</span></em></div><div class="pay-list"><span>CIH Bank</span><span>Attijariwafa Bank</span><span>Cash Plus</span><span>Orange Money</span><span>Inwi Money</span><span>PayPal</span></div></div>
 </div></section>
 </main>
-<footer class="footer"><b>TopUpMorocco</b> — © 2026 جميع الحقوق محفوظة</footer><a aria-label="WhatsApp" class="wa-float" href="https://wa.me/212773125830" rel="noopener" target="_blank">☏</a>
+<footer class="footer"><b>TopUpMorocco</b><span data-ar="— © 2026 جميع الحقوق محفوظة" data-fr="— © 2026 Tous droits réservés">— © 2026 جميع الحقوق محفوظة</span></footer><a aria-label="WhatsApp" class="wa-float" href="https://wa.me/212773125830" rel="noopener" target="_blank">☏</a>
 <script>
 const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg"),playerId=document.getElementById("playerId");
 packs.addEventListener("click",e=>{const b=e.target.closest(".pack");if(!b)return;packs.querySelectorAll(".pack").forEach(x=>x.classList.remove("active"));b.classList.add("active");selected=b.dataset.value;msg.textContent=""});
@@ -67,4 +80,28 @@ document.getElementById("order").addEventListener("click",()=>{const id=playerId
 🎁 الباقة: ${selected}
 🆔 ID اللاعب: ${id}`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
 </script>
+
+<script id="bilingualScript">
+(()=>{
+ const titles={ar:"Free Fire Diamonds | TopUpMorocco",fr:"Free Fire Diamonds | TopUpMorocco"};
+ const apply=(lang)=>{
+   lang=lang==='fr'?'fr':'ar';
+   document.documentElement.lang=lang;
+   document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+   document.querySelectorAll('[data-ar][data-fr]').forEach(el=>el.textContent=el.dataset[lang]);
+   ['placeholder','aria-label','title'].forEach(attr=>{
+     document.querySelectorAll(`[data-${attr}-ar][data-${attr}-fr]`).forEach(el=>el.setAttribute(attr,el.dataset[`${attr}${lang==='ar'?'Ar':'Fr'}`]));
+   });
+   document.querySelectorAll('#languageSwitcher [data-lang]').forEach(b=>b.classList.toggle('active',b.dataset.lang===lang));
+   document.title=titles[lang]||titles.ar;
+   localStorage.setItem('topupmorocco-language',lang);
+ };
+ document.addEventListener('click',e=>{const b=e.target.closest('#languageSwitcher [data-lang]');if(b)apply(b.dataset.lang);});
+ apply(localStorage.getItem('topupmorocco-language')||'ar');
+})();
+</script>
+
+<button aria-label="الرجوع إلى أعلى الصفحة" id="backToTop" title="الرجوع إلى أعلى الصفحة" type="button">↑</button>
+<style id="backToTopStyle">#backToTop{position:fixed;left:20px;bottom:20px;width:48px;height:48px;border:0;border-radius:50%;display:none;align-items:center;justify-content:center;background:#8b4cff;color:#fff;font-size:25px;font-weight:900;cursor:pointer;z-index:9999;box-shadow:0 10px 28px #0008}#backToTop.show{display:flex}</style>
+<script id="backToTopScript">(()=>{const b=document.getElementById('backToTop');const t=()=>b.classList.toggle('show',scrollY>350);addEventListener('scroll',t,{passive:true});t();b.onclick=()=>scrollTo({top:0,behavior:'smooth'});})();</script>
 </body></html>
