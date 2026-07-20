@@ -1,14 +1,14 @@
 {
   "name": "TopUpMorocco",
   "short_name": "TopUpMorocco",
-  "description": "شحن الألعاب والبطاقات الرقمية في المغرب",
+  "description": "شحن الألعاب وشراء البطاقات الرقمية في المغرب",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#050914",
-  "theme_color": "#07101f",
   "icons": [
     {
       "src": "icon-192.png",
