@@ -158,4 +158,29 @@ gtag('config','G-TVV6GEBQT9');
 .breadcrumb,.breadcrumbs{display:flex;justify-content:center;text-align:center;width:100%;}
 </style>
 <script id="backToTopScript">(()=>{const b=document.getElementById('backToTop');const t=()=>b.classList.toggle('show',scrollY>350);addEventListener('scroll',t,{passive:true});t();b.onclick=()=>scrollTo({top:0,behavior:'smooth'});})();</script>
+
+<!-- WhatsApp click tracking for Google Analytics 4 -->
+<script id="whatsappClickTracking">
+document.addEventListener('click', function (event) {
+  const link = event.target.closest('a[href]');
+  if (!link) return;
+
+  const href = link.href || '';
+  const isWhatsAppLink =
+    href.includes('wa.me/') ||
+    href.includes('api.whatsapp.com/') ||
+    href.includes('web.whatsapp.com/') ||
+    href.includes('whatsapp://');
+
+  if (!isWhatsAppLink || typeof gtag !== 'function') return;
+
+  gtag('event', 'whatsapp_click', {
+    link_url: href,
+    page_path: window.location.pathname,
+    page_title: document.title,
+    product_page: window.location.pathname.split('/').pop() || 'index.html'
+  });
+}, true);
+</script>
+
 </body></html>
