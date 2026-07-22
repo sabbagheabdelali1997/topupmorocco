@@ -172,4 +172,31 @@ document.addEventListener('click', function (event) {
 }, true);
 </script>
 
+<script id="whatsappClickTrackingV2">
+(function(){
+function fire(url){
+ if(typeof gtag==='function'){
+   gtag('event','whatsapp_click',{
+     link_url:url||'',
+     page_title:document.title,
+     page_path:location.pathname
+   });
+ }
+}
+document.addEventListener('click',function(e){
+ var a=e.target.closest('a[href]');
+ if(a){
+   var h=a.href||'';
+   if(h.includes('wa.me')||h.includes('api.whatsapp')||h.includes('whatsapp')) fire(h);
+ }
+},true);
+var oldOpen=window.open;
+window.open=function(url){
+ try{
+  if(typeof url==='string'&&(url.includes('wa.me')||url.includes('api.whatsapp')||url.includes('whatsapp'))) fire(url);
+ }catch(e){}
+ return oldOpen.apply(this,arguments);
+};
+})();
+</script>
 </body></html>
