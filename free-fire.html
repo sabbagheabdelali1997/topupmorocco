@@ -123,13 +123,39 @@ html[lang="fr"] .pack{direction:ltr}
       }
     }
   ]
-}</script><!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-TVV6GEBQT9"></script>
-<script>
+}</script><!-- Google Analytics: privacy-first consent mode -->
+<script id="googleConsentMode">
 window.dataLayer=window.dataLayer||[];
 function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config','G-TVV6GEBQT9');
+gtag('consent','default',{
+  analytics_storage:'denied',
+  ad_storage:'denied',
+  ad_user_data:'denied',
+  ad_personalization:'denied',
+  wait_for_update:500
+});
+window.loadTopUpAnalytics=function(){
+  if(window.topUpAnalyticsLoaded)return;
+  window.topUpAnalyticsLoaded=true;
+  gtag('consent','update',{
+    analytics_storage:'granted',
+    ad_storage:'denied',
+    ad_user_data:'denied',
+    ad_personalization:'denied'
+  });
+  const analyticsScript=document.createElement('script');
+  analyticsScript.async=true;
+  analyticsScript.src='https://www.googletagmanager.com/gtag/js?id=G-TVV6GEBQT9';
+  document.head.appendChild(analyticsScript);
+  gtag('js',new Date());
+  gtag('config','G-TVV6GEBQT9',{
+    allow_google_signals:false,
+    allow_ad_personalization_signals:false,
+    cookie_expires:15552000,
+    cookie_update:false,
+    cookie_flags:'SameSite=Lax;Secure'
+  });
+};
 </script>
 
 
@@ -222,12 +248,35 @@ gtag('config','G-TVV6GEBQT9');
 <a class="social-link facebook" href="https://www.facebook.com/profile.php?id=61591972117899" target="_blank" rel="noopener noreferrer" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 22v-9h3l.45-3.5H13.5V7.27c0-1.01.28-1.7 1.73-1.7H17V2.44A23.7 23.7 0 0 0 14.41 2C11.85 2 10.1 3.56 10.1 6.43V9.5H7.2V13h2.9v9h3.4Z"/></svg></a>
 <a class="social-link instagram" href="https://www.instagram.com/topupmorocco.official/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7Zm10.5 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg></a>
 <a class="social-link tiktok" href="https://www.tiktok.com/@topupmorocco" target="_blank" rel="noopener noreferrer" aria-label="TikTok" title="TikTok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 2c.3 2.2 1.55 3.52 3.7 3.66v3.03a7.2 7.2 0 0 1-3.66-1.08v6.23a6.16 6.16 0 1 1-5.32-6.1v3.1a3.12 3.12 0 1 0 2.21 2.99V2h3.07Z"/></svg></a>
-</div><div><b>TopUpMorocco</b><span data-ar="— © 2026 جميع الحقوق محفوظة" data-fr="— © 2026 Tous droits réservés">— © 2026 جميع الحقوق محفوظة</span></div></footer>
+</div><div class="footer-meta"><div><b>TopUpMorocco</b><span data-ar="— © 2026 جميع الحقوق محفوظة" data-fr="— © 2026 Tous droits réservés">— © 2026 جميع الحقوق محفوظة</span></div><div class="legal-links"><a href="privacy-policy.html" data-ar="سياسة الخصوصية" data-fr="Politique de confidentialité">سياسة الخصوصية</a><button id="cookiePreferences" type="button" data-ar="إعدادات ملفات الارتباط" data-fr="Préférences des cookies">إعدادات ملفات الارتباط</button></div></div></footer>
 <script>
 const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg"),playerId=document.getElementById("playerId");
 packs.addEventListener("click",e=>{const b=e.target.closest(".pack");if(!b)return;packs.querySelectorAll(".pack").forEach(x=>x.classList.remove("active"));b.classList.add("active");selected=b.dataset.value;msg.textContent=""});
 document.getElementById("order").addEventListener("click",()=>{const id=playerId.value.trim();if(!selected){msg.textContent="اختر الباقة أولًا.";return}if(!id){msg.textContent="أدخل ID اللاعب.";return}const text=`السلام عليكم،\n\nالمنتج: \u2066شحن جواهر Free Fire\u2069\nالباقة: \u2066${selected}\u2069\nID اللاعب: \u2066${id}\u2069`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
 </script>
+
+<div aria-label="Privacy choices / اختيارات الخصوصية" class="cookie-banner" hidden id="cookieBanner" role="region">
+  <div class="cookie-copy">
+    <strong data-ar="نحترم خصوصيتك" data-fr="Nous respectons votre vie privée">نحترم خصوصيتك</strong>
+    <p data-ar="نستعمل التخزين الضروري لحفظ اللغة واختيارك. لن يتم تشغيل Google Analytics إلا بعد موافقتك، ويمكنك تغيير قرارك لاحقًا." data-fr="Nous utilisons le stockage nécessaire pour mémoriser la langue et votre choix. Google Analytics ne sera activé qu’après votre accord, que vous pourrez modifier plus tard.">نستعمل التخزين الضروري لحفظ اللغة واختيارك. لن يتم تشغيل Google Analytics إلا بعد موافقتك، ويمكنك تغيير قرارك لاحقًا.</p>
+    <a href="privacy-policy.html" data-ar="اقرأ سياسة الخصوصية" data-fr="Lire la politique de confidentialité">اقرأ سياسة الخصوصية</a>
+  </div>
+  <div class="cookie-actions">
+    <button class="cookie-reject" id="cookieReject" type="button" data-ar="رفض التحليلات" data-fr="Refuser l’analyse">رفض التحليلات</button>
+    <button class="cookie-accept" id="cookieAccept" type="button" data-ar="قبول التحليلات" data-fr="Accepter l’analyse">قبول التحليلات</button>
+  </div>
+</div>
+<style id="privacyControlsStyle">
+.footer-meta{display:flex;flex-direction:column;align-items:center;gap:10px}
+.legal-links{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px 14px}
+.legal-links a,.legal-links button{border:0;background:none;padding:2px;color:#b99bff;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.cookie-banner[hidden]{display:none!important}
+.cookie-banner{position:fixed;z-index:10050;left:50%;bottom:18px;transform:translateX(-50%);width:min(920px,calc(100% - 28px));display:flex;align-items:center;justify-content:space-between;gap:22px;padding:18px 20px;border:1px solid #8054c4;border-radius:18px;background:#08111ff7;color:#fff;box-shadow:0 20px 65px #000c;backdrop-filter:blur(14px);text-align:start}
+.cookie-copy{max-width:640px}.cookie-copy strong{display:block;font-size:18px;margin-bottom:6px}.cookie-copy p{margin:0;color:#c4cee1;line-height:1.7;font-size:14px}.cookie-copy a{display:inline-block;margin-top:7px;color:#c29cff;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+.cookie-actions{display:flex;align-items:center;gap:9px;flex:0 0 auto}.cookie-actions button{border-radius:11px;padding:11px 14px;color:#fff;font-weight:900;cursor:pointer}.cookie-reject{border:1px solid #536987;background:#101a2c}.cookie-accept{border:1px solid #9c70ea;background:linear-gradient(135deg,#8b4cff,#6330d7)}
+@media(max-width:720px){.cookie-banner{align-items:stretch;flex-direction:column;gap:14px;bottom:10px;padding:16px}.cookie-actions{display:grid;grid-template-columns:1fr 1fr}.cookie-actions button{padding:12px 8px;font-size:13px}}
+</style>
+
 <script id="bilingualScript">
 (()=>{
  const titles={ar:"Free Fire Diamonds | TopUpMorocco",fr:"Free Fire Diamonds | TopUpMorocco"};
@@ -266,7 +315,7 @@ document.addEventListener('click', function (event) {
     href.includes('web.whatsapp.com/') ||
     href.includes('whatsapp://');
 
-  if (!isWhatsAppLink || typeof gtag !== 'function') return;
+  if (!isWhatsAppLink || !window.topUpAnalyticsLoaded || typeof gtag !== 'function') return;
 
   gtag('event', 'whatsapp_click', {
     link_url: href,
@@ -280,7 +329,7 @@ document.addEventListener('click', function (event) {
 <script id="whatsappClickTrackingV2">
 (function(){
 function fire(url){
- if(typeof gtag==='function'){
+ if(window.topUpAnalyticsLoaded && typeof gtag==='function'){
    gtag('event','whatsapp_click',{
      link_url:url||'',
      page_title:document.title,
@@ -304,4 +353,62 @@ window.open=function(url){
 };
 })();
 </script>
+
+<script id="cookieConsentScript">
+(()=>{
+ const storageKey='topupmorocco-cookie-consent';
+ const consentLifetime=180*24*60*60*1000;
+ const banner=document.getElementById('cookieBanner');
+ const accept=document.getElementById('cookieAccept');
+ const reject=document.getElementById('cookieReject');
+ const preferences=document.getElementById('cookiePreferences');
+ const readChoice=()=>{
+   try{
+     const saved=JSON.parse(localStorage.getItem(storageKey)||'null');
+     if(!saved||!['granted','denied'].includes(saved.value)||Date.now()-saved.savedAt>consentLifetime){
+       localStorage.removeItem(storageKey);
+       return null;
+     }
+     return saved.value;
+   }catch(error){return null;}
+ };
+ const saveChoice=value=>{
+   try{localStorage.setItem(storageKey,JSON.stringify({value,savedAt:Date.now()}));}catch(error){}
+ };
+ const clearAnalyticsCookies=()=>{
+   const analyticsPrefixes=['_ga','_gid','_gat','_gac_'];
+   document.cookie.split(';').forEach(entry=>{
+     const name=entry.split('=')[0].trim();
+     if(!analyticsPrefixes.some(prefix=>name===prefix||name.startsWith(prefix)))return;
+     const base=`${name}=; Max-Age=0; path=/; SameSite=Lax; Secure`;
+     document.cookie=base;
+     document.cookie=`${base}; domain=topupmorocco.com`;
+     document.cookie=`${base}; domain=.topupmorocco.com`;
+   });
+ };
+ const showBanner=()=>{banner.hidden=false;};
+ const hideBanner=()=>{banner.hidden=true;};
+ accept.addEventListener('click',()=>{
+   saveChoice('granted');
+   window.loadTopUpAnalytics();
+   hideBanner();
+ });
+ reject.addEventListener('click',()=>{
+   saveChoice('denied');
+   gtag('consent','update',{
+     analytics_storage:'denied',
+     ad_storage:'denied',
+     ad_user_data:'denied',
+     ad_personalization:'denied'
+   });
+   clearAnalyticsCookies();
+   hideBanner();
+ });
+ if(preferences)preferences.addEventListener('click',showBanner);
+ const choice=readChoice();
+ if(choice==='granted')window.loadTopUpAnalytics();
+ else if(choice===null)showBanner();
+})();
+</script>
+
 </body></html>
