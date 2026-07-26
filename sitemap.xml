@@ -5,7 +5,7 @@
     <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/"/>
     <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/"/>
-    <lastmod>2026-07-24</lastmod>
+    <lastmod>2026-07-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -14,7 +14,7 @@
     <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/"/>
     <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/"/>
-    <lastmod>2026-07-24</lastmod>
+    <lastmod>2026-07-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -59,7 +59,7 @@
     <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/free-fire.html"/>
     <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/free-fire.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/free-fire.html"/>
-    <lastmod>2026-07-24</lastmod>
+    <lastmod>2026-07-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -68,7 +68,25 @@
     <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/free-fire.html"/>
     <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/free-fire.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/free-fire.html"/>
-    <lastmod>2026-07-24</lastmod>
+    <lastmod>2026-07-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://topupmorocco.com/pubg-mobile.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/pubg-mobile.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/pubg-mobile.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/pubg-mobile.html"/>
+    <lastmod>2026-07-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://topupmorocco.com/fr/pubg-mobile.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/pubg-mobile.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/pubg-mobile.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/pubg-mobile.html"/>
+    <lastmod>2026-07-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
