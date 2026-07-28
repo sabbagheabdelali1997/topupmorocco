@@ -255,7 +255,7 @@ window.loadTopUpAnalytics=function(){
 <script>
 const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg"),playerId=document.getElementById("playerId");
 packs.addEventListener("click",e=>{const b=e.target.closest(".pack");if(!b)return;packs.querySelectorAll(".pack").forEach(x=>x.classList.remove("active"));b.classList.add("active");selected=b.dataset.value;msg.textContent=""});
-document.getElementById("order").addEventListener("click",()=>{const id=playerId.value.trim();if(!selected){msg.textContent="Choisissez d’abord un pack.";return}if(!id){msg.textContent="Entrez l’ID du joueur.";return}const text=`Bonjour,\n\nProduit : \u2066Recharge de diamants Free Fire\u2069\nPack : \u2066${selected}\u2069\nID du joueur : \u2066${id}\u2069`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
+document.getElementById("order").addEventListener("click",()=>{const id=playerId.value.trim();if(!selected){msg.textContent="Choisissez d’abord un pack.";return}if(!id){msg.textContent="Entrez l’ID du joueur.";return}const text=`Bonjour l’équipe TopUpMorocco,\n\nJe souhaite finaliser la commande suivante :\n\nProduit : \u2066Recharge de diamants Free Fire\u2069\nOffre sélectionnée : \u2066${selected}\u2069\nIdentifiant du joueur : \u2066${id}\u2069\n\nMerci.`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
 </script>
 
 <div aria-label="Choix de confidentialité" class="cookie-banner" hidden id="cookieBanner" role="region">
