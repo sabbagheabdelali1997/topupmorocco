@@ -5,7 +5,7 @@
     <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/"/>
     <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/"/>
-    <lastmod>2026-07-29</lastmod>
+    <lastmod>2026-08-02</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -14,7 +14,7 @@
     <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/"/>
     <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/"/>
-    <lastmod>2026-07-29</lastmod>
+    <lastmod>2026-08-02</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -123,6 +123,24 @@
     <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/mobile-legends.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/mobile-legends.html"/>
     <lastmod>2026-08-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://topupmorocco.com/whiteout-survival.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/whiteout-survival.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/whiteout-survival.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/whiteout-survival.html"/>
+    <lastmod>2026-08-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://topupmorocco.com/fr/whiteout-survival.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/whiteout-survival.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/whiteout-survival.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/whiteout-survival.html"/>
+    <lastmod>2026-08-02</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
