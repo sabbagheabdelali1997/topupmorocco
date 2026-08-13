@@ -360,4 +360,22 @@
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
+  <url>
+    <loc>https://topupmorocco.com/likee.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/likee.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/likee.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/likee.html"/>
+    <lastmod>2026-08-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://topupmorocco.com/fr/likee.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/likee.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/likee.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/likee.html"/>
+    <lastmod>2026-08-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>
