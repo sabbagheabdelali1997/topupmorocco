@@ -201,7 +201,7 @@ window.loadTopUpAnalytics=function(){
 .social-link.telegram{background:linear-gradient(145deg,#2aabee,#168acd)}
 .pack-category{grid-column:1/-1;margin:16px 0 0;padding:12px 15px;border:1px solid #8b4cff;border-color:color-mix(in srgb,var(--accent,var(--purple,#8b4cff)) 58%,#293b60);border-radius:13px;background:#10182d;background:color-mix(in srgb,var(--theme1,var(--purple,#8b4cff)) 17%,#0a1120);color:#fff;font-size:18px;font-weight:900;text-align:center}
 .pack-category:first-child{margin-top:0}
-.bulk-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center}
+.bulk-grid{display:grid;grid-template-columns:1fr;gap:16px;align-items:center}
 @media(max-width:680px){.bulk-grid{grid-template-columns:1fr}.bulk-grid>div+div{padding-top:14px;border-top:1px solid #7c4bd066}}
 @media(max-width:390px){.order-actions,.request-actions{gap:8px}.order-actions .order,.request-actions .request-btn{padding:13px 8px;font-size:14px}}
 </style>
@@ -213,38 +213,12 @@ window.loadTopUpAnalytics=function(){
 .language-link.active{border-color:#a77aff;background:#23143f;box-shadow:0 0 0 2px #8b4cff33}
 @media(max-width:620px){.language-link{width:38px;height:36px;font-size:20px}}
 </style>
-<style id="standardProductImageFrame">
-.visual{overflow:hidden!important;background:#160B2D!important;border:2px solid #6D4AFF!important;box-shadow:0 12px 30px #0006,0 0 18px #6D4AFF20}
-.product-art-page{border-radius:22px}
-</style><style id="crispVectorProductLogoPage">
-.visual{aspect-ratio:14/9!important;min-height:0!important;background:#160B2D!important;overflow:hidden!important}
-.visual:before,.visual:after{display:none!important}
-.product-art-page{width:var(--logo-w,62%)!important;height:var(--logo-h,62%)!important;object-fit:contain!important;border-radius:0!important}
-img[data-product-logo="apple-itunes"]{--logo-w:30%;--logo-h:58%}
-img[data-product-logo="bigo-live"]{--logo-w:67%;--logo-h:66%}
-img[data-product-logo="delta-force"]{--logo-w:68%;--logo-h:66%}
-img[data-product-logo="discord-nitro"]{--logo-w:43%;--logo-h:70%}
-img[data-product-logo="free-fire"]{--logo-w:72%;--logo-h:54%}
-img[data-product-logo="google-play"]{--logo-w:31%;--logo-h:61%}
-img[data-product-logo="honor-of-kings"]{--logo-w:70%;--logo-h:60%}
-img[data-product-logo="jawaker"]{--logo-w:55%;--logo-h:68%}
-img[data-product-logo="likee"]{--logo-w:57%;--logo-h:68%}
-img[data-product-logo="mobile-legends"]{--logo-w:66%;--logo-h:64%}
-img[data-product-logo="netflix"]{--logo-w:25%;--logo-h:60%}
-img[data-product-logo="playstation"]{--logo-w:31%;--logo-h:60%}
-img[data-product-logo="pubg-mobile"]{--logo-w:48%;--logo-h:70%}
-img[data-product-logo="razer-gold"]{--logo-w:36%;--logo-h:66%}
-img[data-product-logo="roblox"]{--logo-w:30%;--logo-h:60%}
-img[data-product-logo="steam-wallet"]{--logo-w:35%;--logo-h:64%}
-img[data-product-logo="telegram"]{--logo-w:32%;--logo-h:62%}
-img[data-product-logo="twitch"]{--logo-w:31%;--logo-h:60%}
-img[data-product-logo="whiteout-survival"]{--logo-w:69%;--logo-h:62%}
-img[data-product-logo="xbox"]{--logo-w:60%;--logo-h:68%}
-</style><style id="approvedProductCoverImages">
-#grid .card{aspect-ratio:1672/941!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;box-shadow:0 12px 38px #0006,0 0 18px #6D4AFF20!important}
+<style id="approvedProductCoverImages">
+#grid .card{min-height:0!important;aspect-ratio:1672/941!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;box-shadow:0 12px 38px #0006,0 0 18px #6D4AFF20!important}
 #grid .card-top,#grid .pubg .card-top{width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;background:#2B0A4A!important;overflow:hidden!important}
 #grid .product-art,#grid .pubg .product-art{width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important;border-radius:22px!important}
-.visual{aspect-ratio:1672/941!important;min-height:0!important;padding:0!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;overflow:hidden!important}
+#grid .card-body{display:none!important}
+.visual{aspect-ratio:1672/941!important;min-height:0!important;padding:0!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;overflow:hidden!important;box-shadow:0 12px 30px #0006,0 0 18px #6D4AFF20!important}
 .visual:before,.visual:after{display:none!important}
 .product-art-page{width:100%!important;height:100%!important;object-fit:contain!important;border-radius:22px!important}
 </style></head><body><header class="topbar"><a class="brand" href="/fr/">TOPUP <span>MOROCCO</span></a><div class="language-switcher">
@@ -260,7 +234,6 @@ img[data-product-logo="xbox"]{--logo-w:60%;--logo-h:68%}
 <button class="pack" data-value="230,000 Tokens (30 USD) — 273 DH" type="button"><b>230,000 Tokens (30 USD)</b><span>273 DH</span></button>
 <button class="pack" data-value="400,000 Tokens (50 USD) — 458 DH" type="button"><b>400,000 Tokens (50 USD)</b><span>458 DH</span></button></div><div class="bulk"><span>ⓘ</span><div class="bulk-grid">
 <div><strong><span data-ar="خصومات خاصة للطلبات الكبيرة." data-fr="Réductions spéciales pour les grosses commandes.">Réductions spéciales pour les grosses commandes.</span></strong><br><span data-ar="تواصل معنا عبر واتساب أو تلغرام للحصول على أفضل الأسعار." data-fr="Contactez-nous via WhatsApp ou Telegram pour obtenir les meilleurs prix.">Contactez-nous via WhatsApp ou Telegram pour obtenir les meilleurs prix.</span></div>
-<div style="text-align:center"><strong><span data-ar="معلومة مهمة: يتم إرسال كود رقمي صالح للاستخدام مرة واحدة. لتفعيل البطاقة، يلزم إدخال Player Number والكود في صفحة Jawaker الرسمية. بعد إرسال الكود لا يمكن إلغاء الطلب أو استرجاعه." data-fr="Information importante : un code numérique à usage unique est envoyé. L’activation nécessite le Player Number et le code sur la page officielle de Jawaker. Après l’envoi, la commande ne peut être ni annulée ni remboursée.">Information importante : un code numérique à usage unique est envoyé. L’activation nécessite le Player Number et le code sur la page officielle de Jawaker. Après l’envoi, la commande ne peut être ni annulée ni remboursée.</span></strong></div>
 </div></div></div><aside class="panel"><p class="order-options-label"><span data-ar="اطلب عبر واتساب أو تلغرام" data-fr="Commandez via WhatsApp ou Telegram">Commandez via WhatsApp ou Telegram</span></p><div class="order-actions" role="group" aria-label="Choisissez WhatsApp ou Telegram"><button class="order order-whatsapp" id="order" type="button" data-channel="whatsapp" aria-label="Commander via WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a9.84 9.84 0 0 0-8.42 14.93L2 22l5.2-1.52A9.93 9.93 0 1 0 12 2Zm0 17.98a8 8 0 0 1-4.08-1.12l-.29-.17-3.08.9.92-3-.19-.31A8 8 0 1 1 12 19.98Zm4.39-5.98c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.93-1.19-.71-.64-1.2-1.42-1.34-1.66-.14-.24-.01-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.47-.4-.41-.54-.42h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2 0 1.18.86 2.32.98 2.48.12.16 1.69 2.58 4.1 3.62.57.25 1.02.4 1.37.51.58.18 1.1.16 1.51.1.46-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z"/></svg><span data-ar="واتساب" data-fr="WhatsApp">WhatsApp</span></button><button class="order order-telegram" id="orderTelegram" type="button" data-channel="telegram" aria-label="Commander via Telegram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 2.4 2.9 9.6c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.7.1 1 .9 1l2.7-2.6 5.6 4.1c1 .6 1.7.3 2-.9L24 3.6c.4-1.7-.6-2.5-2.4-1.2ZM9.4 12.3l9.4-5.9c.5-.3.9-.1.5.2l-7.7 7-.3 3.6-1.9-4.9Z"/></svg><span data-ar="تلغرام" data-fr="Telegram">Telegram</span></button></div><p class="msg" id="msg"></p><p class="note"><span data-ar="سيتم فتح التطبيق الذي تختاره برسالة جاهزة تتضمن المنتج والعرض المختار." data-fr="L’application choisie s’ouvrira avec un message contenant le produit et l’offre choisis.">L’application choisie s’ouvrira avec un message contenant le produit et l’offre choisis.</span></p><ul class="features"><li><span data-ar="⚡ استلام كود رقمي بعد تأكيد الطلب" data-fr="⚡ Réception d’un code numérique après confirmation">⚡ Réception d’un code numérique après confirmation</span></li><li><span data-ar="🔑 التفعيل عبر Player Number والكود" data-fr="🔑 Activation avec le Player Number et le code">🔑 Activation avec le Player Number et le code</span></li><li><span data-ar="💬 متابعة مباشرة عبر واتساب أو تلغرام" data-fr="💬 Suivi direct via WhatsApp ou Telegram">💬 Suivi direct via WhatsApp ou Telegram</span></li></ul></aside></div><div class="payments"><div class="heading"><em><span data-ar="طرق الدفع" data-fr="Moyens de paiement">Moyens de paiement</span></em></div><div class="pay-list"><span>CIH Bank</span><span>Attijariwafa Bank</span><span>Cash Plus</span><span>Orange Money</span><span>BMCE | BANK OF AFRICA</span><span>PayPal</span></div></div></div></section>
 <section class="related-products" aria-labelledby="related-products-title">
   <h2 id="related-products-title"><span data-ar="قد يهمك أيضًا" data-fr="Vous pourriez aussi aimer">Vous pourriez aussi aimer</span></h2>
@@ -275,7 +248,7 @@ img[data-product-logo="xbox"]{--logo-w:60%;--logo-h:68%}
 <a class="social-link telegram" href="https://t.me/topupmorocco" target="_blank" rel="noopener noreferrer" aria-label="Telegram" title="Telegram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 2.4 2.9 9.6c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.7.1 1 .9 1l2.7-2.6 5.6 4.1c1 .6 1.7.3 2-.9L24 3.6c.4-1.7-.6-2.5-2.4-1.2ZM9.4 12.3l9.4-5.9c.5-.3.9-.1.5.2l-7.7 7-.3 3.6-1.9-4.9Z"/></svg></a>
 <a class="social-link facebook" href="https://www.facebook.com/profile.php?id=61591972117899" target="_blank" rel="noopener noreferrer" aria-label="Facebook" title="Facebook"><svg viewbox="0 0 24 24" aria-hidden="true"><path d="M13.5 22v-9h3l.45-3.5H13.5V7.27c0-1.01.28-1.7 1.73-1.7H17V2.44A23.7 23.7 0 0 0 14.41 2C11.85 2 10.1 3.56 10.1 6.43V9.5H7.2V13h2.9v9h3.4Z"></path></svg></a>
 <a class="social-link instagram" href="https://www.instagram.com/topupmorocco.official/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram"><svg viewbox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7Zm10.5 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"></path></svg></a>
-<a class="social-link tiktok" href="https://www.tiktok.com/@topupmorocco" target="_blank" rel="noopener noreferrer" aria-label="TikTok" title="TikTok"><svg viewbox="0 0 24 24" aria-hidden="true"><path d="M15.6 2c.3 2.2 1.55 3.52 3.7 3.66v3.03a7.2 7.2 0 0 1-3.66-1.08v6.23a6.16 6.16 0 1 1-5.32-6.1v3.1a3.12 3.12 0 1 0 2.21 2.99V2h3.07Z"></path></svg></a>
+
 </div><div class="footer-meta"><div><b>TopUpMorocco</b><span data-ar="— © 2026 جميع الحقوق محفوظة" data-fr="— © 2026 Tous droits réservés">— © 2026 Tous droits réservés</span></div><div class="legal-links"><a href="privacy-policy.html" data-ar="سياسة الخصوصية" data-fr="Politique de confidentialité">Politique de confidentialité</a><button id="cookiePreferences" type="button" data-ar="إعدادات ملفات الارتباط" data-fr="Préférences des cookies">Préférences des cookies</button></div></div></footer><script>const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg");packs.addEventListener("click",e=>{const b=e.target.closest(".pack");if(!b)return;packs.querySelectorAll(".pack").forEach(x=>x.classList.remove("active"));b.classList.add("active");selected=b.dataset.value;msg.textContent=""});document.getElementById("order").addEventListener("click",()=>{if(!selected){msg.textContent="Choisissez d’abord une offre.";return}const text=`Bonjour l’équipe TopUpMorocco,\n\nJe souhaite finaliser la commande suivante :\n\nProduit : \u2066Jawaker Gift Card Global\u2069\nOffre sélectionnée : \u2066${selected}\u2069\n\nMerci.`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});</script>
 
 <div aria-label="Choix de confidentialité" class="cookie-banner" hidden id="cookieBanner" role="region">
