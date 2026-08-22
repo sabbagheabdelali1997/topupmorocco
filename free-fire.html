@@ -232,38 +232,12 @@ window.loadTopUpAnalytics=function(){
 .language-link.active{border-color:#a77aff;background:#23143f;box-shadow:0 0 0 2px #8b4cff33}
 @media(max-width:620px){.language-link{width:38px;height:36px;font-size:20px}}
 </style>
-<style id="standardProductImageFrame">
-.visual{overflow:hidden!important;background:#160B2D!important;border:2px solid #6D4AFF!important;box-shadow:0 12px 30px #0006,0 0 18px #6D4AFF20}
-.product-art-page{border-radius:22px}
-</style><style id="crispVectorProductLogoPage">
-.visual{aspect-ratio:14/9!important;min-height:0!important;background:#160B2D!important;overflow:hidden!important}
-.visual:before,.visual:after{display:none!important}
-.product-art-page{width:var(--logo-w,62%)!important;height:var(--logo-h,62%)!important;object-fit:contain!important;border-radius:0!important}
-img[data-product-logo="apple-itunes"]{--logo-w:30%;--logo-h:58%}
-img[data-product-logo="bigo-live"]{--logo-w:67%;--logo-h:66%}
-img[data-product-logo="delta-force"]{--logo-w:68%;--logo-h:66%}
-img[data-product-logo="discord-nitro"]{--logo-w:43%;--logo-h:70%}
-img[data-product-logo="free-fire"]{--logo-w:72%;--logo-h:54%}
-img[data-product-logo="google-play"]{--logo-w:31%;--logo-h:61%}
-img[data-product-logo="honor-of-kings"]{--logo-w:70%;--logo-h:60%}
-img[data-product-logo="jawaker"]{--logo-w:55%;--logo-h:68%}
-img[data-product-logo="likee"]{--logo-w:57%;--logo-h:68%}
-img[data-product-logo="mobile-legends"]{--logo-w:66%;--logo-h:64%}
-img[data-product-logo="netflix"]{--logo-w:25%;--logo-h:60%}
-img[data-product-logo="playstation"]{--logo-w:31%;--logo-h:60%}
-img[data-product-logo="pubg-mobile"]{--logo-w:48%;--logo-h:70%}
-img[data-product-logo="razer-gold"]{--logo-w:36%;--logo-h:66%}
-img[data-product-logo="roblox"]{--logo-w:30%;--logo-h:60%}
-img[data-product-logo="steam-wallet"]{--logo-w:35%;--logo-h:64%}
-img[data-product-logo="telegram"]{--logo-w:32%;--logo-h:62%}
-img[data-product-logo="twitch"]{--logo-w:31%;--logo-h:60%}
-img[data-product-logo="whiteout-survival"]{--logo-w:69%;--logo-h:62%}
-img[data-product-logo="xbox"]{--logo-w:60%;--logo-h:68%}
-</style><style id="approvedProductCoverImages">
-#grid .card{aspect-ratio:1672/941!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;box-shadow:0 12px 38px #0006,0 0 18px #6D4AFF20!important}
+<style id="approvedProductCoverImages">
+#grid .card{min-height:0!important;aspect-ratio:1672/941!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;box-shadow:0 12px 38px #0006,0 0 18px #6D4AFF20!important}
 #grid .card-top,#grid .pubg .card-top{width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;background:#2B0A4A!important;overflow:hidden!important}
 #grid .product-art,#grid .pubg .product-art{width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important;border-radius:22px!important}
-.visual{aspect-ratio:1672/941!important;min-height:0!important;padding:0!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;overflow:hidden!important}
+#grid .card-body{display:none!important}
+.visual{aspect-ratio:1672/941!important;min-height:0!important;padding:0!important;border:0!important;border-radius:22px!important;background:#2B0A4A!important;overflow:hidden!important;box-shadow:0 12px 30px #0006,0 0 18px #6D4AFF20!important}
 .visual:before,.visual:after{display:none!important}
 .product-art-page{width:100%!important;height:100%!important;object-fit:contain!important;border-radius:22px!important}
 </style></head>
@@ -298,7 +272,7 @@ img[data-product-logo="xbox"]{--logo-w:60%;--logo-h:68%}
 <a aria-label="Telegram" class="social-link telegram" href="https://t.me/topupmorocco" rel="noopener noreferrer" target="_blank" title="Telegram"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M21.6 2.4 2.9 9.6c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.7.1 1 .9 1l2.7-2.6 5.6 4.1c1 .6 1.7.3 2-.9L24 3.6c.4-1.7-.6-2.5-2.4-1.2ZM9.4 12.3l9.4-5.9c.5-.3.9-.1.5.2l-7.7 7-.3 3.6-1.9-4.9Z"></path></svg></a>
 <a aria-label="Facebook" class="social-link facebook" href="https://www.facebook.com/profile.php?id=61591972117899" rel="noopener noreferrer" target="_blank" title="Facebook"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M13.5 22v-9h3l.45-3.5H13.5V7.27c0-1.01.28-1.7 1.73-1.7H17V2.44A23.7 23.7 0 0 0 14.41 2C11.85 2 10.1 3.56 10.1 6.43V9.5H7.2V13h2.9v9h3.4Z"></path></svg></a>
 <a aria-label="Instagram" class="social-link instagram" href="https://www.instagram.com/topupmorocco.official/" rel="noopener noreferrer" target="_blank" title="Instagram"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7Zm10.5 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"></path></svg></a>
-<a aria-label="TikTok" class="social-link tiktok" href="https://www.tiktok.com/@topupmorocco" rel="noopener noreferrer" target="_blank" title="TikTok"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M15.6 2c.3 2.2 1.55 3.52 3.7 3.66v3.03a7.2 7.2 0 0 1-3.66-1.08v6.23a6.16 6.16 0 1 1-5.32-6.1v3.1a3.12 3.12 0 1 0 2.21 2.99V2h3.07Z"></path></svg></a>
+
 </div><div class="footer-meta"><div><b>TopUpMorocco</b><span data-ar="— © 2026 جميع الحقوق محفوظة" data-fr="— © 2026 Tous droits réservés">— © 2026 جميع الحقوق محفوظة</span></div><div class="legal-links"><a data-ar="سياسة الخصوصية" data-fr="Politique de confidentialité" href="privacy-policy.html">سياسة الخصوصية</a><button data-ar="إعدادات ملفات الارتباط" data-fr="Préférences des cookies" id="cookiePreferences" type="button">إعدادات ملفات الارتباط</button></div></div></footer>
 <script>
 const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg"),playerId=document.getElementById("playerId");
