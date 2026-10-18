@@ -558,4 +558,22 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://topupmorocco.com/free-fire-codes.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/free-fire-codes.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/free-fire-codes.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/free-fire-codes.html"/>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://topupmorocco.com/fr/free-fire-codes.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/free-fire-codes.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/free-fire-codes.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/free-fire-codes.html"/>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>
