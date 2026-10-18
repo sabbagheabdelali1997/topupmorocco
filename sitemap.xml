@@ -576,4 +576,22 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://topupmorocco.com/ea-sports-fc-26.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/ea-sports-fc-26.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/ea-sports-fc-26.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/ea-sports-fc-26.html"/>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://topupmorocco.com/fr/ea-sports-fc-26.html</loc>
+    <xhtml:link rel="alternate" hreflang="ar-MA" href="https://topupmorocco.com/ea-sports-fc-26.html"/>
+    <xhtml:link rel="alternate" hreflang="fr-MA" href="https://topupmorocco.com/fr/ea-sports-fc-26.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://topupmorocco.com/ea-sports-fc-26.html"/>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>
