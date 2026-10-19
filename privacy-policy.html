@@ -89,7 +89,18 @@ window.loadTopUpAnalytics=function(){
 .customer-transactions-copy small{color:#d7c8e7;font-size:13px;line-height:1.55;text-align:center}
 @media(max-width:480px){.customer-transactions-link{min-height:100px;padding:20px 22px}.customer-transactions-copy strong{font-size:17px}.customer-transactions-copy small{font-size:12px}}
 </style>
-</head>
+<style id="singleLineTitlesStyle">
+h1,h2,#special-request .special-request h3{white-space:nowrap!important;min-width:0;max-width:100%;box-sizing:border-box}
+h1 br,h2 br,#special-request .special-request h3 br{display:none}
+h1 bdi,h2 bdi,#special-request .special-request h3 bdi{display:inline-block;direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+#special-request .heading{text-align:center}
+#special-request .heading em{display:block;font-size:clamp(24px,4.8vw,30px);font-weight:900;line-height:1.4;margin-bottom:14px;text-align:center}
+#special-request .heading h2{display:block;width:100%;margin-inline:auto;text-align:center}
+</style><style id="responsivePageHeadingsStyle">
+.copy h1{font-size:clamp(20px,5.5vw,46px);white-space:nowrap!important}
+.activation-guide h2{font-size:clamp(14px,4vw,26px);white-space:nowrap!important;text-align:center;width:100%}
+h1 bdi,h2 bdi{display:inline-block;direction:ltr;unicode-bidi:isolate;white-space:nowrap!important}
+</style></head>
 <body>
 <header class="topbar"><a class="brand" href="/">TOPUP <span>MOROCCO</span></a><div class="language-switcher"><a class="language-link active" href="/privacy-policy.html" lang="ar" hreflang="ar-MA" aria-label="العربية" title="العربية" aria-current="page">🇲🇦</a>
 <a class="language-link" href="/fr/privacy-policy.html" lang="fr" hreflang="fr-MA" aria-label="Français" title="Français">🇫🇷</a></div></header>
@@ -225,5 +236,39 @@ window.loadTopUpAnalytics=function(){
  },true);
 })();
 </script>
-</body>
+<script id="singleLineTitlesScript">
+(()=>{
+ const headings=Array.from(document.querySelectorAll('h1,h2,#special-request .special-request h3'));
+ const widths=new WeakMap();
+ const originalSizes=new WeakMap();
+ headings.forEach(el=>{
+  originalSizes.set(el,el.style.getPropertyValue('font-size'));
+  el.querySelectorAll('br').forEach(br=>br.replaceWith(document.createTextNode(' ')));
+ });
+ const fit=(el,force=false)=>{
+  const width=el.clientWidth;
+  if(!width||(!force&&widths.get(el)===width))return;
+  widths.set(el,width);
+  const original=originalSizes.get(el);
+  if(original)el.style.setProperty('font-size',original);
+  else el.style.removeProperty('font-size');
+  let size=parseFloat(getComputedStyle(el).fontSize);
+  for(let i=0;i<4&&el.scrollWidth>el.clientWidth;i++){
+   size=Math.max(1,Math.floor(size*(el.clientWidth/el.scrollWidth)*98)/100);
+   el.style.setProperty('font-size',`${size}px`,'important');
+  }
+ };
+ const fitAll=()=>headings.forEach(el=>fit(el,true));
+ let frame;
+ const schedule=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(fitAll);};
+ if('ResizeObserver' in window){
+  const observer=new ResizeObserver(entries=>entries.forEach(entry=>fit(entry.target)));
+  headings.forEach(el=>observer.observe(el));
+ }
+ addEventListener('resize',schedule,{passive:true});
+ addEventListener('load',schedule,{once:true});
+ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(schedule);
+ fitAll();
+})();
+</script></body>
 </html>
