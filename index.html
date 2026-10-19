@@ -194,6 +194,15 @@ h1 bdi,h2 bdi{display:inline-block;direction:ltr;unicode-bidi:isolate;white-spac
 #topups[hidden],#gift-cards[hidden],#game-codes[hidden]{display:none!important}
 #grid .card.hidden,#giftCardsGrid .card.hidden,#gameCodesGrid .card.hidden,#grid .card[hidden],#giftCardsGrid .card[hidden],#gameCodesGrid .card[hidden]{display:none!important}
 @media(max-width:520px){.catalog-category-nav{gap:7px}.catalog-category-nav a{font-size:12px;padding:13px 5px;gap:8px}.catalog-category-icon{font-size:22px}}
+</style><style id="productLayoutBoundsStyle">
+.hero-card{min-width:0;max-width:100%;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
+.hero-card>.copy,.hero-card>.visual{min-width:0!important;min-inline-size:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box}
+.hero-card .copy>h1,.hero-card .copy>p{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+.hero-card .copy>p{white-space:normal;overflow-wrap:anywhere}
+.hero-card .visual>img,.hero-card .visual>span{min-width:0;max-width:100%!important;box-sizing:border-box}
+.hero-card .visual img{object-fit:contain!important}
+h1,h2,#special-request .special-request h3{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+@media(max-width:800px){.hero-card{grid-template-columns:minmax(0,1fr)!important}}
 </style></head>
 <body>
 <header class="topbar"><a class="brand" href="/">TOPUP <span>MOROCCO</span></a><div class="language-switcher">
@@ -470,20 +479,35 @@ window.open=function(url){
  const headings=Array.from(document.querySelectorAll('h1,h2,#special-request .special-request h3'));
  const widths=new WeakMap();
  const originalSizes=new WeakMap();
+ const availableWidth=el=>{
+  const parent=el.parentElement;
+  if(!parent)return el.clientWidth;
+  const style=getComputedStyle(parent);
+  const inner=parent.clientWidth-(parseFloat(style.paddingLeft)||0)-(parseFloat(style.paddingRight)||0);
+  return Math.min(el.clientWidth||inner,inner);
+ };
+ const contentWidth=el=>{
+  const range=document.createRange();
+  range.selectNodeContents(el);
+  const measured=range.getBoundingClientRect().width;
+  return Math.max(measured,el.scrollWidth);
+ };
  headings.forEach(el=>{
   originalSizes.set(el,el.style.getPropertyValue('font-size'));
   el.querySelectorAll('br').forEach(br=>br.replaceWith(document.createTextNode(' ')));
  });
  const fit=(el,force=false)=>{
-  const width=el.clientWidth;
-  if(!width||(!force&&widths.get(el)===width))return;
+  const width=availableWidth(el);
+  if(width<=0||(!force&&widths.get(el)===width))return;
   widths.set(el,width);
   const original=originalSizes.get(el);
   if(original)el.style.setProperty('font-size',original);
   else el.style.removeProperty('font-size');
   let size=parseFloat(getComputedStyle(el).fontSize);
-  for(let i=0;i<4&&el.scrollWidth>el.clientWidth;i++){
-   size=Math.max(1,Math.floor(size*(el.clientWidth/el.scrollWidth)*98)/100);
+  for(let i=0;i<6;i++){
+   const measured=contentWidth(el);
+   if(measured<=width)break;
+   size=Math.max(1,Math.floor(size*(width/measured)*98)/100);
    el.style.setProperty('font-size',`${size}px`,'important');
   }
  };
