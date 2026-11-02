@@ -269,7 +269,8 @@ h1 bdi,h2 bdi{display:inline-block;direction:ltr;unicode-bidi:isolate;white-spac
 .hero-card .visual img{object-fit:contain!important}
 h1,h2,#special-request .special-request h3{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
 @media(max-width:800px){.hero-card{grid-template-columns:minmax(0,1fr)!important}}
-</style><link rel="stylesheet" href="trust-refresh.css"/></head>
+</style><link rel="stylesheet" href="trust-refresh.css"/><link rel="stylesheet" href="free-fire-verify.css?v=1"/>
+</head>
 <body>
 <header class="topbar"><a class="brand" href="/">TOPUP <span>MOROCCO</span></a><div class="language-switcher">
 <a class="language-link active" href="/free-fire.html" lang="ar" hreflang="ar-MA" aria-label="العربية" title="العربية" aria-current="page">🇲🇦</a>
@@ -306,7 +307,7 @@ h1,h2,#special-request .special-request h3{min-width:0;max-width:100%;width:100%
 <script>
 const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg"),playerId=document.getElementById("playerId");
 packs.addEventListener("click",e=>{const b=e.target.closest(".pack");if(!b)return;packs.querySelectorAll(".pack").forEach(x=>x.classList.remove("active"));b.classList.add("active");selected=b.dataset.value;msg.textContent=""});
-document.getElementById("order").addEventListener("click",()=>{const id=playerId.value.trim();if(!selected){msg.textContent="اختر الباقة أولًا.";return}if(!id){msg.textContent="أدخل ID اللاعب.";return}const text=`السلام عليكم فريق TopUpMorocco،\n\nأود إتمام الطلب التالي:\n\nالمنتج: \u2066شحن جواهر Free Fire\u2069\nالعرض المختار: \u2066${selected}\u2069\nمعرّف اللاعب: \u2066${id}\u2069\n\nمع الشكر.`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
+document.getElementById("order").addEventListener("click",()=>{const id=playerId.value.trim();if(!selected){msg.textContent="اختر الباقة أولًا.";return}if(!id){msg.textContent="أدخل ID اللاعب.";return}const text=`السلام عليكم فريق TopUpMorocco،\n\nأود إتمام الطلب التالي:\n\nالمنتج: \u2066شحن جواهر Free Fire\u2069\nالعرض المختار: \u2066${selected}\u2069\nمعرّف اللاعب: \u2066${id}\u2069\nاسم اللاعب: ${window.freeFireVerifiedName()}\n\nمع الشكر.`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
 </script>
 <div aria-label="Privacy choices / اختيارات الخصوصية" class="cookie-banner" hidden="" id="cookieBanner" role="region">
 <div class="cookie-copy">
@@ -528,4 +529,5 @@ window.open=function(url){
  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(schedule);
  fitAll();
 })();
-</script><script src="trust-refresh-order.js?v=20261102" defer></script></body></html>
+</script><script src="free-fire-verify.js?v=1"></script>
+<script src="trust-refresh-order.js?v=20261102" defer></script></body></html>
