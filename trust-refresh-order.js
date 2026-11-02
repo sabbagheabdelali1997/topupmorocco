@@ -2,8 +2,8 @@
  'use strict';
  const fr=document.documentElement.lang==='fr';
  const t=fr?{
-  title:'Vérifiez votre commande',subtitle:'Vérifiez le produit et le pack avant d’envoyer votre demande.',product:'Produit',offer:'Pack et prix',channel:'Envoyer via',edit:'Modifier',send:'Confirmer et ouvrir ',note:'Votre demande sera envoyée au service client. Le paiement et le délai de livraison seront confirmés avec vous.',empty:'',delivery:'Livraison et assistance',details:'Après confirmation du paiement, votre commande est traitée selon le produit. Demandez le délai avant de payer.'
- }:{title:'راجع طلبك',subtitle:'راجع المنتج والباقة قبل إرسال الطلب.',product:'المنتج',offer:'الباقة والثمن',channel:'الإرسال عبر',edit:'تعديل الاختيار',send:'تأكيد وفتح ',note:'سيُرسل طلبك إلى خدمة الزبناء، ويتم تأكيد الدفع ومدة التسليم معك.',empty:'',delivery:'التسليم والمساعدة',details:'بعد تأكيد الدفع، تتم معالجة الطلب حسب المنتج. يُرجى الاستفسار عن مدة التسليم قبل الدفع.'};
+  title:'Vérifiez votre commande',subtitle:'Vérifiez le produit et le pack avant d’envoyer votre demande.',product:'Produit',offer:'Pack et prix',channel:'Envoyer via',edit:'Modifier',send:'Confirmer et ouvrir ',note:'Votre demande sera envoyée au service client. Le paiement et le délai de livraison seront confirmés avec vous.',empty:''
+ }:{title:'راجع طلبك',subtitle:'راجع المنتج والباقة قبل إرسال الطلب.',product:'المنتج',offer:'الباقة والثمن',channel:'الإرسال عبر',edit:'تعديل الاختيار',send:'تأكيد وفتح ',note:'سيُرسل طلبك إلى خدمة الزبناء، ويتم تأكيد الدفع ومدة التسليم معك.',empty:''};
  let approving=false,trigger=null,dialog=null;
  const make=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text)el.textContent=text;return el;};
  function build(){
@@ -30,6 +30,4 @@
   document.querySelectorAll('main input').forEach(input=>{if(['hidden','search','checkbox','radio','button','submit','password'].includes(input.type)||!input.value.trim()||input.closest('[hidden],.hidden'))return;const label=input.id?document.querySelector('label[for="'+CSS.escape(input.id)+'"]'):null;if(label)row(label.textContent.trim(),input.value.trim());});
   const channel=button.id==='orderTelegram'?'Telegram':'WhatsApp';row(t.channel,channel);document.getElementById('tmReviewConfirm').textContent=t.send+channel;dialog.showModal();
  },true);
- const panel=document.querySelector('main aside.panel');
- if(panel){const details=make('details','tm-delivery-info');details.append(make('summary','',t.delivery),make('p','',t.details));panel.append(details);}
 })();
