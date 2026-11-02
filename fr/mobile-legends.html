@@ -271,7 +271,8 @@ h1 bdi,h2 bdi{display:inline-block;direction:ltr;unicode-bidi:isolate;white-spac
 .hero-card .visual img{object-fit:contain!important}
 h1,h2,#special-request .special-request h3{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
 @media(max-width:800px){.hero-card{grid-template-columns:minmax(0,1fr)!important}}
-</style><link rel="stylesheet" href="../trust-refresh.css"/></head>
+</style><link rel="stylesheet" href="../trust-refresh.css"/><link rel="stylesheet" href="../mobile-legends-verify.css?v=1"/>
+</head>
 <body>
 <header class="topbar"><a class="brand" href="/fr/">TOPUP <span>MOROCCO</span></a><div class="language-switcher">
 <a class="language-link" href="/mobile-legends.html" lang="ar" hreflang="ar-MA" aria-label="العربية" title="العربية">🇲🇦</a>
@@ -323,7 +324,7 @@ h1,h2,#special-request .special-request h3{min-width:0;max-width:100%;width:100%
 <script>
 const phone="212773125830";let selected="";const packs=document.getElementById("packs"),msg=document.getElementById("msg"),playerId=document.getElementById("playerId"),serverId=document.getElementById("serverId");
 packs.addEventListener("click",e=>{const b=e.target.closest(".pack");if(!b)return;packs.querySelectorAll(".pack").forEach(x=>x.classList.remove("active"));b.classList.add("active");selected=b.dataset.value;msg.textContent=""});
-document.getElementById("order").addEventListener("click",()=>{const player=playerId.value.trim(),server=serverId.value.trim();if(!selected){msg.textContent="Choisissez d’abord une offre.";return}if(!player){msg.textContent="Saisissez le Player ID.";playerId.focus();return}if(!server){msg.textContent="Saisissez le Server ID.";serverId.focus();return}const text=`Bonjour l’équipe TopUpMorocco,\n\nJe souhaite finaliser la commande suivante :\n\nProduit : \u2066Mobile Legends\u2069\nOffre sélectionnée : \u2066${selected}\u2069\nPlayer ID : \u2066${player}\u2069\nServer ID : \u2066${server}\u2069\n\nMerci.`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
+document.getElementById("order").addEventListener("click",()=>{const player=playerId.value.trim(),server=serverId.value.trim();if(!selected){msg.textContent="Choisissez d’abord une offre.";return}if(!player){msg.textContent="Saisissez le Player ID.";playerId.focus();return}if(!server){msg.textContent="Saisissez le Server ID.";serverId.focus();return}const text=`Bonjour l’équipe TopUpMorocco,\n\nJe souhaite finaliser la commande suivante :\n\nProduit : \u2066Mobile Legends\u2069\nOffre sélectionnée : \u2066${selected}\u2069\nPlayer ID : \u2066${player}\u2069\nServer ID : \u2066${server}\u2069\nNom du joueur: \u2066${window.mlVerifiedName()}\u2069\n\nMerci.`;window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank","noopener")});
 </script>
 
 <div aria-label="Choix de confidentialité" class="cookie-banner" hidden id="cookieBanner" role="region">
@@ -551,4 +552,5 @@ window.open=function(url){
  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(schedule);
  fitAll();
 })();
-</script><script src="../trust-refresh-order.js?v=20261102" defer></script></body></html>
+</script><script src="../mobile-legends-verify.js?v=1"></script>
+<script src="../trust-refresh-order.js?v=20261102" defer></script></body></html>
