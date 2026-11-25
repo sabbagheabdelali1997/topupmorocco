@@ -1,0 +1,188 @@
+name: FazerCards - relever les offres
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Read offers for TopUpMorocco
+        env:
+          FAZERCARDS_API_KEY: ${{ secrets.FAZERCARDS_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlencode, quote
+          from urllib.request import Request, urlopen
+
+          base_url = "https://api.fzr.cards/api/v2"
+          api_key = os.environ.get("FAZERCARDS_API_KEY", "").strip()
+          if not api_key:
+              raise SystemExit("Missing repository secret FAZERCARDS_API_KEY.")
+
+          last_request = 0.0
+
+          def read(path, **params):
+              global last_request
+              url = base_url + path
+              if params:
+                  url += "?" + urlencode(params)
+              for attempt in range(3):
+                  try:
+                      time.sleep(max(0, 0.6 - (time.monotonic() - last_request)))
+                      last_request = time.monotonic()
+                      request = Request(url, headers={"X-API-Key": api_key, "Accept": "application/json"})
+                      with urlopen(request, timeout=20) as response:
+                          result = json.load(response)
+                      if result.get("ok") is not True:
+                          raise RuntimeError(f"{path}: API did not return success")
+                      return result
+                  except HTTPError as error:
+                      if attempt == 2 or error.code not in {429, 500, 502, 503, 504}:
+                          raise RuntimeError(f"{path}: HTTP {error.code}") from None
+                      retry_after = error.headers.get("Retry-After", "")
+                      time.sleep(min(int(retry_after), 60) if retry_after.isdecimal() else 2 ** attempt)
+                  except (URLError, TimeoutError):
+                      if attempt == 2:
+                          raise RuntimeError(f"{path}: connection failed") from None
+                      time.sleep(2 ** attempt)
+
+          def offer_ids(path, rows_key, id_field, **params):
+              return [{"id": row[id_field], "name": row.get("name", "")}
+                      for row in read(path, **params)[rows_key]]
+
+          offer_readers = {
+              "gift_cards": lambda id: offer_ids("/giftcards/cards", "offers", "card_id", category_id=id),
+              "topups": lambda id: offer_ids("/topups/offers", "offers", "offer_id", category_id=id),
+              "game_keys": lambda id: offer_ids("/gamekeys/keys", "keys", "key_id", game_id=id),
+              "manual_services": lambda id: offer_ids(f"/manual-services/{quote(str(id), safe='')}/offers", "items", "id"),
+          }
+          candidates = {
+              "amazon": {"gift_cards": ["amazon_ae", "amazon_ae_instant_use", "amazon_au", "amazon_be", "amazon_ca", "amazon_de", "amazon_eg", "amazon_es", "amazon_fr", "amazon_in", "amazon_it", "amazon_it_instant_use", "amazon_jp", "amazon_jp_instant_use", "amazon_nl", "amazon_sa", "amazon_sa_instant_use", "amazon_sg", "amazon_tr", "amazon_tr_instant_use", "amazon_uk", "amazon_us"]},
+              "apex-legends": {"gift_cards": ["apex_legends_mobile_sg"]},
+              "apple-itunes": {"gift_cards": ["app_store_itunes_ae", "app_store_itunes_at", "app_store_itunes_au", "app_store_itunes_au_instant_use", "app_store_itunes_be", "app_store_itunes_br", "app_store_itunes_br_instant_use", "app_store_itunes_ca", "app_store_itunes_cn", "app_store_itunes_de", "app_store_itunes_es", "app_store_itunes_fr", "app_store_itunes_hk", "app_store_itunes_id", "app_store_itunes_ie", "app_store_itunes_ie_instant_use", "app_store_itunes_in", "app_store_itunes_it", "app_store_itunes_jp", "app_store_itunes_lu", "app_store_itunes_mx", "app_store_itunes_mx_instant_use", "app_store_itunes_nl", "app_store_itunes_nz", "app_store_itunes_pl", "app_store_itunes_pt", "app_store_itunes_ru", "app_store_itunes_sa", "app_store_itunes_tr", "app_store_itunes_tr_instant_use", "app_store_itunes_uk", "app_store_itunes_us"]},
+              "arc-raiders": {"game_keys": ["arc_raiders_row"]},
+              "battle-net": {"gift_cards": ["battle_net_br", "battle_net_ca", "battle_net_ch", "battle_net_eu", "battle_net_id", "battle_net_id_instant_use", "battle_net_my", "battle_net_my_instant_use", "battle_net_pl", "battle_net_sg", "battle_net_th", "battle_net_us"]},
+              "bigo-live": {"gift_cards": ["bigo_live", "bigo_live_instant_use"], "topups": ["bigo_live"]},
+              "blood-strike": {"topups": ["blood_strike", "blood_strike_mena"]},
+              "brawl-stars": {},
+              "call-of-duty-mobile": {"topups": ["codm_activision_in"]},
+              "chamet": {"topups": ["chamet"]},
+              "clash-of-clans": {},
+              "delta-force": {"gift_cards": ["delta_force_steam_global"], "topups": ["delta_force"]},
+              "destiny-2": {"game_keys": ["destiny_2_cis", "destiny_2_global", "destiny_2_cis_instant_use"]},
+              "discord-nitro": {"gift_cards": ["discord_global", "discord_global_instant_use", "discord_us"]},
+              "ea-sports-fc-26": {},
+              "ea-sports-fc-mobile": {"topups": ["eafc_mobile_id", "eafc_mobile_kh", "eafc_mobile_my", "eafc_mobile_sg"]},
+              "efootball": {},
+              "firefly-live": {"topups": ["firefly_live"]},
+              "free-fire-codes": {"gift_cards": ["free_fire", "free_fire_diamond_pins_eu_tr"], "topups": ["free_fire_bd", "free_fire_br", "free_fire_cis", "free_fire_eu", "free_fire_id", "free_fire_latam", "free_fire_mena", "free_fire_my_sg", "free_fire_ph", "free_fire_sg", "free_fire_th", "free_fire_tw", "free_fire_vn"]},
+              "free-fire": {"gift_cards": ["free_fire", "free_fire_diamond_pins_eu_tr"], "topups": ["free_fire_bd", "free_fire_br", "free_fire_cis", "free_fire_eu", "free_fire_id", "free_fire_latam", "free_fire_mena", "free_fire_my_sg", "free_fire_ph", "free_fire_sg", "free_fire_th", "free_fire_tw", "free_fire_vn"]},
+              "gamestop": {"gift_cards": ["gamestop_us"]},
+              "genshin-impact": {"topups": ["genshin_impact_login", "genshin_impact_global"]},
+              "google-play": {"gift_cards": ["google_play_ae", "google_play_at", "google_play_be", "google_play_br", "google_play_br_instant_use", "google_play_de", "google_play_es", "google_play_fr", "google_play_id", "google_play_id_instant_use", "google_play_in", "google_play_in_instant_use", "google_play_it", "google_play_jp", "google_play_kr", "google_play_nl", "google_play_pl", "google_play_sa", "google_play_tr", "google_play_tr_instant_use", "google_play_uk", "google_play_us"]},
+              "gta-v": {"game_keys": ["grand_theft_auto_v_global"]},
+              "honkai-star-rail": {"topups": ["honkai_star_rail_global"]},
+              "honor-of-kings": {"gift_cards": ["honor_of_kings_token_global", "honor_of_kings_token_global_instant_use"], "topups": ["honor_of_kings"]},
+              "imo": {"gift_cards": ["imo", "imo_instant_use"], "topups": ["imo"]},
+              "jawaker": {"gift_cards": ["jawaker", "jawaker_instant_use"]},
+              "kingshot": {"topups": ["kingshot"]},
+              "likee": {"topups": ["likee"]},
+              "lords-mobile": {"topups": ["lords_mobile"]},
+              "mico": {"gift_cards": ["mico_live_global"], "topups": ["mico"]},
+              "minecraft": {"gift_cards": ["minecraft_minecoins", "minecraft_minecoins_instant_use", "minecraft_java_bedrock_global"], "game_keys": ["minecraft_java_bedrock_global"]},
+              "mobile-legends": {"gift_cards": ["mobile_legends_voucher_global"], "topups": ["mobile_legends_brazil", "mobile_legends_exclusive", "mobile_legends_global", "mobile_legends_indonesia", "mobile_legends_malaysia", "mobile_legends_philippines", "mobile_legends_ru", "mobile_legends_singapore", "mobile_legends_special", "mobile_legends_turkey", "mobile_legends_united_states", "mobile_legends_adventure"]},
+              "modern-strike-online": {"topups": ["modern_strike_online"]},
+              "monster-hunter-outlanders": {},
+              "netease-pay": {"gift_cards": ["netease_pay_aed", "netease_pay_bdt", "netease_pay_brl", "netease_pay_cad", "netease_pay_clp", "netease_pay_cop", "netease_pay_eur", "netease_pay_idr", "netease_pay_krw", "netease_pay_mmk", "netease_pay_mxn", "netease_pay_myr", "netease_pay_ngn", "netease_pay_rub", "netease_pay_sar", "netease_pay_sgd", "netease_pay_thb", "netease_pay_try", "netease_pay_usd", "netease_pay_vnd"]},
+              "netflix": {"gift_cards": ["netflix_ae", "netflix_br", "netflix_ch", "netflix_co", "netflix_eu", "netflix_mx", "netflix_pl", "netflix_sa", "netflix_uk", "netflix_us"]},
+              "nintendo-eshop": {"gift_cards": ["nintendo_br", "nintendo_ca", "nintendo_de", "nintendo_eu", "nintendo_hk", "nintendo_jp", "nintendo_mx", "nintendo_pl", "nintendo_se", "nintendo_uk", "nintendo_us", "nintendo_switch_br", "nintendo_switch_ch", "nintendo_switch_eu", "nintendo_switch_mx", "nintendo_switch_pl", "nintendo_switch_us"]},
+              "noon": {},
+              "playstation": {"gift_cards": ["playstation_ae", "playstation_ar", "playstation_at", "playstation_au", "playstation_be", "playstation_bh", "playstation_br", "playstation_ca", "playstation_ch", "playstation_cz", "playstation_de", "playstation_es", "playstation_fi", "playstation_fr", "playstation_hk", "playstation_hr", "playstation_hu", "playstation_id", "playstation_ie", "playstation_in", "playstation_it", "playstation_jp", "playstation_kw", "playstation_lb", "playstation_lu", "playstation_my", "playstation_nl", "playstation_nz", "playstation_om", "playstation_pl", "playstation_pt", "playstation_qa", "playstation_ro", "playstation_sa", "playstation_sg", "playstation_sk", "playstation_th", "playstation_tr", "playstation_uk", "playstation_us", "playstation_za"]},
+              "poppo-live": {"topups": ["poppo_live"]},
+              "pubg-mobile": {"gift_cards": ["pubg_mobile"], "topups": ["pubg_mobile_auto", "pubg_mobile_manual", "pubg_mobile_reserve"]},
+              "razer-gold": {"gift_cards": ["razer_gold_au", "razer_gold_br", "razer_gold_ca", "razer_gold_cl", "razer_gold_co", "razer_gold_global", "razer_gold_hk", "razer_gold_id", "razer_gold_in", "razer_gold_mx", "razer_gold_my", "razer_gold_ph", "razer_gold_sg", "razer_gold_tr", "razer_gold_us", "razer_gold_vn"], "manual_services": ["razer_gold_loaded_accounts_china", "razer_gold_loaded_accounts_global"]},
+              "red-dead-redemption-2": {"game_keys": ["red_dead_redemption_2_global"]},
+              "rewarble": {"gift_cards": ["rewarble_eur", "rewarble_usd"]},
+              "roblox": {"gift_cards": ["roblox_ae", "roblox_at", "roblox_au", "roblox_br", "roblox_ca", "roblox_ch", "roblox_dk", "roblox_eu", "roblox_fr", "roblox_global", "roblox_hk", "roblox_id", "roblox_jp", "roblox_mx", "roblox_my", "roblox_no", "roblox_nz", "roblox_pl", "roblox_ru", "roblox_sa", "roblox_se", "roblox_sg", "roblox_th", "roblox_uk", "roblox_us", "roblox_za", "roblox_robux_us"]},
+              "soulchill": {"gift_cards": ["soulchill"], "topups": ["soulchill"]},
+              "steam-wallet": {"gift_cards": ["steam_wallet_ae", "steam_wallet_ar", "steam_wallet_br", "steam_wallet_cl", "steam_wallet_co", "steam_wallet_cr", "steam_wallet_eu", "steam_wallet_global", "steam_wallet_hk", "steam_wallet_id", "steam_wallet_in", "steam_wallet_kr", "steam_wallet_mx", "steam_wallet_my", "steam_wallet_pe", "steam_wallet_ph", "steam_wallet_qa", "steam_wallet_sg", "steam_wallet_th", "steam_wallet_tr", "steam_wallet_tw", "steam_wallet_us", "steam_wallet_uy", "steam_wallet_vn", "steam_wallet_za"]},
+              "sugo": {"topups": ["sugo_online_chat_party"]},
+              "telegram": {"gift_cards": ["telegram_premium", "telegram_stars"]},
+              "tiktok": {"gift_cards": ["tiktok_ae", "tiktok_de", "tiktok_it", "tiktok_jp", "tiktok_cn", "tiktok_cn_instant_use"]},
+              "tod": {},
+              "twitch": {"gift_cards": ["twitch_at", "twitch_au", "twitch_be", "twitch_ca", "twitch_es", "twitch_eu", "twitch_nl", "twitch_uk", "twitch_usd"]},
+              "valorant": {"gift_cards": ["riot_access_code_ae", "riot_access_code_au", "riot_access_code_bh", "riot_access_code_br", "riot_access_code_ca", "riot_access_code_ch", "riot_access_code_dk", "riot_access_code_eu", "riot_access_code_hk", "riot_access_code_kw", "riot_access_code_my", "riot_access_code_no", "riot_access_code_nz", "riot_access_code_ph", "riot_access_code_pl", "riot_access_code_sa", "riot_access_code_se", "riot_access_code_sg", "riot_access_code_th", "riot_access_code_tr", "riot_access_code_uk", "riot_access_code_us", "valorant_ae", "valorant_au", "valorant_bh", "valorant_by", "valorant_ca", "valorant_eu", "valorant_hk", "valorant_id", "valorant_in", "valorant_in_instant_use", "valorant_kw", "valorant_my", "valorant_nz", "valorant_ph", "valorant_ru", "valorant_sg", "valorant_th", "valorant_tr", "valorant_ua", "valorant_uk", "valorant_us"], "topups": ["valorant_id", "valorant_kh", "valorant_my", "valorant_ph", "valorant_sg", "valorant_th", "valorant_vn"]},
+              "whiteout-survival": {"topups": ["whiteout_survival"]},
+              "xbox": {"gift_cards": ["xbox_game_pass_au", "xbox_game_pass_br", "xbox_game_pass_eu", "xbox_game_pass_hk", "xbox_game_pass_in", "xbox_game_pass_jp", "xbox_game_pass_mena", "xbox_game_pass_mx", "xbox_game_pass_sg", "xbox_game_pass_us", "xbox_ae", "xbox_au", "xbox_br", "xbox_br_instant_use", "xbox_ca", "xbox_co", "xbox_de", "xbox_dk", "xbox_eu", "xbox_hk", "xbox_hu", "xbox_jp", "xbox_mx", "xbox_no", "xbox_pl", "xbox_sa", "xbox_tr", "xbox_uk", "xbox_us", "xbox_za"], "manual_services": ["xbox_loaded_accounts_us"]},
+              "yalla-ludo": {"gift_cards": ["yalla_ludo_diamond", "yalla_ludo_gold", "yalla_ludo_gold_instant_use"], "topups": ["yalla_ludo"]},
+              "yoho": {"topups": ["yoho_group_voice_chat_room"]},
+              "zenless-zone-zero": {"topups": ["zenless_zone_zero_global"]},
+          }
+          category_offers = {kind: {} for kind in offer_readers}
+          successful = 0
+          failed = 0
+          for page in candidates.values():
+              for kind, ids in page.items():
+                  for category_id in ids:
+                      if category_id in category_offers[kind]:
+                          continue
+                      try:
+                          category_offers[kind][category_id] = {
+                              "offers": offer_readers[kind](category_id),
+                          }
+                          successful += 1
+                      except (RuntimeError, ValueError, KeyError, TypeError) as exc:
+                          category_offers[kind][category_id] = {
+                              "error": str(exc) if isinstance(exc, RuntimeError) else "Unexpected API response",
+                          }
+                          failed += 1
+
+          quote_types = {}
+          for name, path, fields in (
+              ("telegram_stars", "/telegram/stars", ("min_amount", "max_amount")),
+              ("telegram_premium", "/telegram/premium", ("plans",)),
+              ("steam_topup", "/steam-topup/rates", ()),
+          ):
+              try:
+                  quote_data = read(path)
+                  quote_types[name] = {
+                      field: [plan["months"] for plan in quote_data[field]]
+                      if field == "plans" else quote_data[field]
+                      for field in fields
+                  }
+              except (RuntimeError, ValueError, KeyError, TypeError):
+                  quote_types[name] = {"error": "Could not read quote metadata"}
+
+          report = {
+              "site_candidates": candidates,
+              "category_offers": category_offers,
+              "quote_types": quote_types,
+          }
+          Path("fazercards-offers.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+          )
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("### FazerCards offers for TopUpMorocco\n\n")
+              summary.write(f"Category lookups succeeded: {successful}. Failed: {failed}.\n\n")
+              summary.write("Download the fazercards-offers artifact for offer identifiers.\n")
+          if not successful:
+              raise SystemExit("No FazerCards offer endpoint could be read.")
+          PY
+
+      - name: Upload offer identifiers
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: fazercards-offers
+          path: fazercards-offers.json
+          if-no-files-found: ignore
+          retention-days: 3
