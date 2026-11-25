@@ -63,7 +63,7 @@ jobs:
               base = Decimal(str(usd)) * 11
               if not base.is_finite() or base <= 0:
                   raise ValueError("Invalid supplier price")
-              margin = 3 if base < 60 else 6 if base < 90 else 9
+              margin = 4 if base < 60 else 6 if base < 90 else 9
               return int((base + margin).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
