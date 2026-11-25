@@ -1,0 +1,683 @@
+name: FazerCards - publier les prix
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topupmorocco-pages-publication
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.FAZERCARDS_AUTO_PUBLISH == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Calculate prices
+        env:
+          FAZERCARDS_API_KEY: ${{ secrets.FAZERCARDS_API_KEY }}
+          FAZER_PREVIEW_DIR: ${{ runner.temp }}/fazer-price-preview
+        run: |
+          python3 - <<'PY'
+          import csv
+          import html
+          import io
+          import json
+          import os
+          import re
+          import time
+          from collections import defaultdict
+          from decimal import Decimal, ROUND_HALF_UP
+          from functools import lru_cache
+          from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlencode
+          from urllib.request import HTTPRedirectHandler, Request, build_opener
+          from zipfile import ZIP_DEFLATED, ZipFile
+
+          ROOT = Path(os.environ.get("FAZER_SITE_ROOT", "."))
+          API = "https://api.fzr.cards/api/v2"
+          BUTTON = re.compile(r"<button\b(?P<attrs>[^>]*)>(?P<body>.*?)</button\s*>", re.I | re.S)
+          ATTR = re.compile(r"""([\w:-]+)\s*=\s*(["'])(.*?)\2""", re.S)
+          PRICE_TAIL = re.compile(r"(\s+[—–-]\s+)(\d+)(\s*(?:DH|MAD))\s*$")
+          SHOW_PRICE = re.compile(r"(>\s*)(\d+(?:,\d{3})*)(\s*(?:DH|MAD)\s*<)")
+          SOURCES = {
+              "gift_cards": ("/giftcards/cards", "offers", "card_id"),
+              "topups": ("/topups/offers", "offers", "offer_id"),
+          }
+
+
+          def sell_price(usd):
+              base = Decimal(str(usd)) * 11
+              if not base.is_finite() or base <= 0:
+                  raise ValueError("Invalid supplier price")
+              margin = 3 if base < 60 else 6 if base < 90 else 9
+              return int((base + margin).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+
+          @lru_cache(maxsize=None)
+          def request(path, category=""):
+              url = API + path
+              if category:
+                  url += "?" + urlencode({"category_id": category})
+              opener = build_opener(NoRedirect)
+              for attempt in range(3):
+                  try:
+                      key = os.environ["FAZERCARDS_API_KEY"].strip()
+                      if not key:
+                          raise ValueError("Missing FAZERCARDS_API_KEY")
+                      with opener.open(Request(url, headers={"X-API-Key": key, "Accept": "application/json"}), timeout=20) as stream:
+                          result = json.load(stream)
+                      if result.get("ok") is not True:
+                          raise ValueError("Unsuccessful API response")
+                      time.sleep(.6)
+                      return result
+                  except HTTPError as exc:
+                      if attempt == 2 or exc.code not in {429, 500, 502, 503, 504}:
+                          raise ValueError(f"HTTP {exc.code}") from None
+                      delay = exc.headers.get("Retry-After", "")
+                      time.sleep(min(60, int(delay)) if delay.isdecimal() else 2 ** attempt)
+                  except (URLError, TimeoutError):
+                      if attempt == 2:
+                          raise ValueError("API connection failed") from None
+                      time.sleep(2 ** attempt)
+
+
+          def quote(kind, category, offer):
+              if kind == "telegram_stars":
+                  result = request("/telegram/stars")
+                  quantity = int(offer)
+                  if not int(result["min_amount"]) <= quantity <= int(result["max_amount"]):
+                      raise ValueError("Quantity outside supplier limits")
+                  return Decimal(str(result["price_per_star"])) * quantity
+              if kind == "telegram_premium":
+                  rows = request("/telegram/premium")["plans"]
+                  matches = [item["price_usd"] for item in rows if str(item["months"]) == offer]
+              else:
+                  path, collection, id_field = SOURCES[kind]
+                  rows = request(path, category)[collection]
+                  matches = [item["price_usd"] for item in rows if str(item[id_field]) == offer]
+              if len(matches) != 1:
+                  raise ValueError("Supplier offer missing or ambiguous")
+              return matches[0]
+
+
+          def attributes(button):
+              return {m[1].lower(): (html.unescape(m[3]), m.span(3)) for m in ATTR.finditer(button["attrs"])}
+
+
+          def price_field(attrs, label, region, field):
+              if "pack" not in attrs.get("class", ("", None))[0].split():
+                  return None
+              if attrs.get("data-region", ("", None))[0] != region or field not in attrs:
+                  return None
+              raw, span = attrs[field]
+              if field == "data-value":
+                  m = PRICE_TAIL.search(raw)
+                  if not m or raw[:m.start()] != label:
+                      return None
+                  return int(m[2]), span
+              if attrs.get("data-name", ("", None))[0] == label and raw.isdecimal():
+                  return int(raw), span
+              return None
+
+
+          def edit_button(text, label, region, field, new_price):
+              found = []
+              for button in BUTTON.finditer(text):
+                  match = price_field(attributes(button), label, region, field)
+                  if match:
+                      found.append((button, match))
+              if len(found) != 1:
+                  raise ValueError("Page button missing or ambiguous")
+              button, (old_price, (start, end)) = found[0]
+              if old_price == new_price:
+                  return text, old_price
+              raw = button["attrs"][start:end]
+              if field == "data-value":
+                  raw, count = re.subn(r"\d+(?=\s*(?:DH|MAD)\s*$)", str(new_price), raw)
+                  if count != 1:
+                      raise ValueError("Cannot update order price")
+              else:
+                  raw = str(new_price)
+              body, count = SHOW_PRICE.subn(
+                  lambda m: f"{m[1]}{format(new_price, "," if "," in m[2] else "d")}{m[3]}"
+                  if int(m[2].replace(",", "")) == old_price else m[0],
+                  button["body"],
+              )
+              if count != 1 or body == button["body"]:
+                  raise ValueError("Cannot update visible price")
+              start += button.start("attrs")
+              end += button.start("attrs")
+              return text[:start] + raw + text[end:button.start("body")] + body + text[button.end("body"):], old_price
+
+
+          def update_price_range(text):
+              prices = []
+              for button in BUTTON.finditer(text):
+                  attrs = attributes(button)
+                  if "pack" not in attrs.get("class", ("", None))[0].split():
+                      continue
+                  for field in ("data-price", "data-uid", "data-login"):
+                      raw = attrs.get(field, ("", None))[0]
+                      if raw.isdecimal():
+                          prices.append(int(raw))
+                  if tail := PRICE_TAIL.search(attrs.get("data-value", ("", None))[0]):
+                      prices.append(int(tail[2]))
+              if not prices:
+                  return text
+              for name, value in (("lowPrice", min(prices)), ("highPrice", max(prices))):
+                  text = re.sub(rf'("{name}"\s*:\s*"?)[\d.]+', lambda m: f"{m[1]}{value}", text)
+              return text
+
+
+          def run(mapping, output):
+              output.mkdir(exist_ok=True)
+              files, changed, rows = {}, set(), []
+              if not os.environ.get("FAZERCARDS_API_KEY", "").strip():
+                  raise SystemExit("Missing repository secret FAZERCARDS_API_KEY")
+              for page, kind, category, offer, ar, fr in mapping:
+                  try:
+                      new_price = sell_price(quote(kind, category, offer))
+                      variants = ((page, ar), (f"fr/{page}", fr))
+                      pending, old_prices = {}, []
+                      for filename, (label, region, field) in variants:
+                          if filename not in files:
+                              files[filename] = (ROOT / filename).read_text(encoding="utf-8")
+                          pending[filename], old_price = edit_button(files[filename], label, region, field, new_price)
+                          old_prices.append(old_price)
+                      changed.update(name for name in pending if pending[name] != files[name])
+                      files.update(pending)
+                      rows.append((page, ar[0], offer, *old_prices, new_price, "OK"))
+                  except (KeyError, ValueError, ArithmeticError, FileNotFoundError) as exc:
+                      detail = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+                      rows.append((page, ar[0], offer, "", "", "", detail))
+              with (output / "fazercards-price-preview.csv").open("w", encoding="utf-8-sig", newline="") as stream:
+                  writer = csv.writer(stream)
+                  writer.writerow(("Page", "Offer", "Fazer ID", "Old AR MAD", "Old FR MAD", "New MAD", "Status"))
+                  writer.writerows(rows)
+              with ZipFile(output / "topupmorocco-prices-preview.zip", "w", ZIP_DEFLATED) as archive:
+                  for name in sorted(changed):
+                      archive.writestr(name, update_price_range(files[name]))
+              success = sum(row[-1] == "OK" for row in rows)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                  summary.write("### FazerCards price preview\n\n")
+                  summary.write(f"- Offers priced: {success} / {len(rows)}\n- Pages with price changes: {len(changed)}\n")
+                  summary.write("- Download the artifact for the full report and preview HTML.\n")
+              if not success:
+                  raise SystemExit("No offer could be priced.")
+
+
+          MAPPING = [
+              ["amazon.html","gift_cards","amazon_us","5_usd",["Amazon Gift Card USA — 5 USD","","data-value"],["Amazon Gift Card USA — 5 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","10_usd",["Amazon Gift Card USA — 10 USD","","data-value"],["Amazon Gift Card USA — 10 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","15_usd",["Amazon Gift Card USA — 15 USD","","data-value"],["Amazon Gift Card USA — 15 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","20_usd",["Amazon Gift Card USA — 20 USD","","data-value"],["Amazon Gift Card USA — 20 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","25_usd",["Amazon Gift Card USA — 25 USD","","data-value"],["Amazon Gift Card USA — 25 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","30_usd",["Amazon Gift Card USA — 30 USD","","data-value"],["Amazon Gift Card USA — 30 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","40_usd",["Amazon Gift Card USA — 40 USD","","data-value"],["Amazon Gift Card USA — 40 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","50_usd",["Amazon Gift Card USA — 50 USD","","data-value"],["Amazon Gift Card USA — 50 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_us","100_usd",["Amazon Gift Card USA — 100 USD","","data-value"],["Amazon Gift Card USA — 100 USD","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","5_aed",["Amazon Gift Card UAE — 5 AED","","data-value"],["Amazon Gift Card UAE — 5 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","10_aed",["Amazon Gift Card UAE — 10 AED","","data-value"],["Amazon Gift Card UAE — 10 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","15_aed",["Amazon Gift Card UAE — 15 AED","","data-value"],["Amazon Gift Card UAE — 15 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","20_aed",["Amazon Gift Card UAE — 20 AED","","data-value"],["Amazon Gift Card UAE — 20 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","30_aed",["Amazon Gift Card UAE — 30 AED","","data-value"],["Amazon Gift Card UAE — 30 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","50_aed",["Amazon Gift Card UAE — 50 AED","","data-value"],["Amazon Gift Card UAE — 50 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","100_aed",["Amazon Gift Card UAE — 100 AED","","data-value"],["Amazon Gift Card UAE — 100 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","150_aed",["Amazon Gift Card UAE — 150 AED","","data-value"],["Amazon Gift Card UAE — 150 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","200_aed",["Amazon Gift Card UAE — 200 AED","","data-value"],["Amazon Gift Card UAE — 200 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","250_aed",["Amazon Gift Card UAE — 250 AED","","data-value"],["Amazon Gift Card UAE — 250 AED","","data-value"]],
+              ["amazon.html","gift_cards","amazon_ae","400_aed",["Amazon Gift Card UAE — 400 AED","","data-value"],["Amazon Gift Card UAE — 400 AED","","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","2_usd",["2 USD (USA)","USA","data-value"],["2 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","3_usd",["3 USD (USA)","USA","data-value"],["3 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","4_usd",["4 USD (USA)","USA","data-value"],["4 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","5_usd",["5 USD (USA)","USA","data-value"],["5 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","6_usd",["6 USD (USA)","USA","data-value"],["6 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","7_usd",["7 USD (USA)","USA","data-value"],["7 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","8_usd",["8 USD (USA)","USA","data-value"],["8 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","9_usd",["9 USD (USA)","USA","data-value"],["9 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","10_usd",["10 USD (USA)","USA","data-value"],["10 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","15_usd",["15 USD (USA)","USA","data-value"],["15 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","20_usd",["20 USD (USA)","USA","data-value"],["20 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","25_usd",["25 USD (USA)","USA","data-value"],["25 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","30_usd",["30 USD (USA)","USA","data-value"],["30 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","40_usd",["40 USD (USA)","USA","data-value"],["40 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","45_usd",["45 USD (USA)","USA","data-value"],["45 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","50_usd",["50 USD (USA)","USA","data-value"],["50 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","60_usd",["60 USD (USA)","USA","data-value"],["60 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","70_usd",["70 USD (USA)","USA","data-value"],["70 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","80_usd",["80 USD (USA)","USA","data-value"],["80 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","90_usd",["90 USD (USA)","USA","data-value"],["90 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_us","100_usd",["100 USD (USA)","USA","data-value"],["100 USD (USA)","USA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","50_aed",["50 AED (UAE)","UAE","data-value"],["50 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","75_aed",["75 AED (UAE)","UAE","data-value"],["75 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","100_aed",["100 AED (UAE)","UAE","data-value"],["100 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","150_aed",["150 AED (UAE)","UAE","data-value"],["150 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","200_aed",["200 AED (UAE)","UAE","data-value"],["200 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","250_aed",["250 AED (UAE)","UAE","data-value"],["250 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","300_aed",["300 AED (UAE)","UAE","data-value"],["300 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","400_aed",["400 AED (UAE)","UAE","data-value"],["400 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_ae","500_aed",["500 AED (UAE)","UAE","data-value"],["500 AED (UAE)","UAE","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","100_try",["100 TRY (TR)","TR","data-value"],["100 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","150_try",["150 TRY (TR)","TR","data-value"],["150 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","200_try",["200 TRY (TR)","TR","data-value"],["200 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","250_try",["250 TRY (TR)","TR","data-value"],["250 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","300_try",["300 TRY (TR)","TR","data-value"],["300 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","400_try",["400 TRY (TR)","TR","data-value"],["400 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","500_try",["500 TRY (TR)","TR","data-value"],["500 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","600_try",["600 TRY (TR)","TR","data-value"],["600 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","750_try",["750 TRY (TR)","TR","data-value"],["750 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","1000_try",["1000 TRY (TR)","TR","data-value"],["1000 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","1250_try",["1250 TRY (TR)","TR","data-value"],["1250 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_tr","1500_try",["1500 TRY (TR)","TR","data-value"],["1500 TRY (TR)","TR","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_sa","50_sar",["50 SAR (SA)","SA","data-value"],["50 SAR (SA)","SA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_sa","75_sar",["75 SAR (SA)","SA","data-value"],["75 SAR (SA)","SA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_sa","100_sar",["100 SAR (SA)","SA","data-value"],["100 SAR (SA)","SA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_sa","200_sar",["200 SAR (SA)","SA","data-value"],["200 SAR (SA)","SA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_sa","300_sar",["300 SAR (SA)","SA","data-value"],["300 SAR (SA)","SA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_sa","400_sar",["400 SAR (SA)","SA","data-value"],["400 SAR (SA)","SA","data-value"]],
+              ["apple-itunes.html","gift_cards","app_store_itunes_sa","500_sar",["500 SAR (SA)","SA","data-value"],["500 SAR (SA)","SA","data-value"]],
+              ["battle-net.html","gift_cards","battle_net_us","5_usd",["USA — 5 USD","","data-value"],["USA — 5 USD","","data-value"]],
+              ["battle-net.html","gift_cards","battle_net_us","10_usd",["USA — 10 USD","","data-value"],["USA — 10 USD","","data-value"]],
+              ["battle-net.html","gift_cards","battle_net_us","20_usd",["USA — 20 USD","","data-value"],["USA — 20 USD","","data-value"]],
+              ["battle-net.html","gift_cards","battle_net_us","50_usd",["USA — 50 USD","","data-value"],["USA — 50 USD","","data-value"]],
+              ["battle-net.html","gift_cards","battle_net_eu","20_eur",["Europe — 20 EUR","","data-value"],["Europe — 20 EUR","","data-value"]],
+              ["battle-net.html","gift_cards","battle_net_eu","50_eur",["Europe — 50 EUR","","data-value"],["Europe — 50 EUR","","data-value"]],
+              ["battle-net.html","gift_cards","battle_net_eu","100_eur",["Europe — 100 EUR","","data-value"],["Europe — 100 EUR","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","50_diamonds",["50 Diamonds","","data-value"],["50 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","100_diamonds",["100 Diamonds","","data-value"],["100 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","200_diamonds",["200 Diamonds","","data-value"],["200 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","300_diamonds",["300 Diamonds","","data-value"],["300 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","400_diamonds",["400 Diamonds","","data-value"],["400 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","500_diamonds",["500 Diamonds","","data-value"],["500 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","600_diamonds",["600 Diamonds","","data-value"],["600 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","700_diamonds",["700 Diamonds","","data-value"],["700 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","800_diamonds",["800 Diamonds","","data-value"],["800 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","900_diamonds",["900 Diamonds","","data-value"],["900 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","1000_diamonds",["1000 Diamonds","","data-value"],["1000 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","2000_diamonds",["2000 Diamonds","","data-value"],["2000 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","3000_diamonds",["3000 Diamonds","","data-value"],["3000 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","4000_diamonds",["4000 Diamonds","","data-value"],["4000 Diamonds","","data-value"]],
+              ["bigo-live.html","topups","bigo_live","5000_diamonds",["5000 Diamonds","","data-value"],["5000 Diamonds","","data-value"]],
+              ["delta-force.html","topups","delta_force","60_delta_coins",["60 Delta Coins","","data-value"],["60 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","320_delta_coins",["320 Delta Coins","","data-value"],["320 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","460_delta_coins",["460 Delta Coins","","data-value"],["460 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","750_delta_coins",["750 Delta Coins","","data-value"],["750 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","1480_delta_coins",["1480 Delta Coins","","data-value"],["1480 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","1980_delta_coins",["1980 Delta Coins","","data-value"],["1980 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","3950_delta_coins",["3950 Delta Coins","","data-value"],["3950 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","8100_delta_coins",["8100 Delta Coins","","data-value"],["8100 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","16200_delta_coins",["16200 Delta Coins","","data-value"],["16200 Delta Coins","","data-value"]],
+              ["delta-force.html","topups","delta_force","season_pass_operations_special",["Season Pass Operations Special","","data-value"],["Season Pass Operations Special","","data-value"]],
+              ["delta-force.html","topups","delta_force","season_pass_warfare_special",["Season Pass Warfare Special","","data-value"],["Season Pass Warfare Special","","data-value"]],
+              ["delta-force.html","topups","delta_force","season_pass_delta_force_deluxe",["Season Pass Delta Force Deluxe","","data-value"],["Season Pass Delta Force Deluxe","","data-value"]],
+              ["firefly-live.html","topups","firefly_live","107_gems",["107 Gems","","data-value"],["107 Gems","","data-value"]],
+              ["firefly-live.html","topups","firefly_live","214_gems",["214 Gems","","data-value"],["214 Gems","","data-value"]],
+              ["firefly-live.html","topups","firefly_live","321_gems",["321 Gems","","data-value"],["321 Gems","","data-value"]],
+              ["firefly-live.html","topups","firefly_live","643_gems",["643 Gems","","data-value"],["643 Gems","","data-value"]],
+              ["firefly-live.html","topups","firefly_live","3159_gems",["3,159 Gems","","data-value"],["3,159 Gems","","data-value"]],
+              ["free-fire.html","topups","free_fire_mena","110_diamonds",["110 💎","","data-value"],["110 💎","","data-value"]],
+              ["free-fire.html","topups","free_fire_mena","231_diamonds",["231 💎","","data-value"],["231 💎","","data-value"]],
+              ["free-fire.html","topups","free_fire_mena","583_diamonds",["583 💎","","data-value"],["583 💎","","data-value"]],
+              ["free-fire.html","topups","free_fire_mena","1188_diamonds",["1188 💎","","data-value"],["1188 💎","","data-value"]],
+              ["free-fire.html","topups","free_fire_mena","2420_diamonds",["2420 💎","","data-value"],["2420 💎","","data-value"]],
+              ["gamestop.html","gift_cards","gamestop_us","10_usd",["GameStop Gift Card USA — 10 USD","","data-value"],["GameStop Gift Card USA — 10 USD","","data-value"]],
+              ["gamestop.html","gift_cards","gamestop_us","25_usd",["GameStop Gift Card USA — 25 USD","","data-value"],["GameStop Gift Card USA — 25 USD","","data-value"]],
+              ["gamestop.html","gift_cards","gamestop_us","50_usd",["GameStop Gift Card USA — 50 USD","","data-value"],["GameStop Gift Card USA — 50 USD","","data-value"]],
+              ["gamestop.html","gift_cards","gamestop_us","100_usd",["GameStop Gift Card USA — 100 USD","","data-value"],["GameStop Gift Card USA — 100 USD","","data-value"]],
+              ["genshin-impact.html","topups","genshin_impact_global","60_genesis_crystals",["60 Genesis Crystals","","data-value"],["60 Genesis Crystals","","data-value"]],
+              ["genshin-impact.html","topups","genshin_impact_global","300_30_genesis_crystals",["330 Genesis Crystals","","data-value"],["330 Genesis Crystals","","data-value"]],
+              ["genshin-impact.html","topups","genshin_impact_global","980_110_genesis_crystals",["1090 Genesis Crystals","","data-value"],["1090 Genesis Crystals","","data-value"]],
+              ["genshin-impact.html","topups","genshin_impact_global","1980_260_genesis_crystals",["2240 Genesis Crystals","","data-value"],["2240 Genesis Crystals","","data-value"]],
+              ["genshin-impact.html","topups","genshin_impact_global","3280_600_genesis_crystals",["3880 Genesis Crystals","","data-value"],["3880 Genesis Crystals","","data-value"]],
+              ["genshin-impact.html","topups","genshin_impact_global","6480_1600_genesis_crystals",["8080 Genesis Crystals","","data-value"],["8080 Genesis Crystals","","data-value"]],
+              ["genshin-impact.html","topups","genshin_impact_global","blessing_of_the_welkin_moon",["Blessing of the Welkin Moon","","data-value"],["Blessing of the Welkin Moon","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","5_usd",["Google Play USA — 5 USD","","data-value"],["Google Play USA — 5 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","10_usd",["Google Play USA — 10 USD","","data-value"],["Google Play USA — 10 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","15_usd",["Google Play USA — 15 USD","","data-value"],["Google Play USA — 15 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","20_usd",["Google Play USA — 20 USD","","data-value"],["Google Play USA — 20 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","25_usd",["Google Play USA — 25 USD","","data-value"],["Google Play USA — 25 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","50_usd",["Google Play USA — 50 USD","","data-value"],["Google Play USA — 50 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","75_usd",["Google Play USA — 75 USD","","data-value"],["Google Play USA — 75 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_us","100_usd",["Google Play USA — 100 USD","","data-value"],["Google Play USA — 100 USD","","data-value"]],
+              ["google-play.html","gift_cards","google_play_ae","30_aed",["Google Play UAE — 30 AED","","data-value"],["Google Play UAE — 30 AED","","data-value"]],
+              ["google-play.html","gift_cards","google_play_ae","50_aed",["Google Play UAE — 50 AED","","data-value"],["Google Play UAE — 50 AED","","data-value"]],
+              ["google-play.html","gift_cards","google_play_ae","100_aed",["Google Play UAE — 100 AED","","data-value"],["Google Play UAE — 100 AED","","data-value"]],
+              ["google-play.html","gift_cards","google_play_ae","300_aed",["Google Play UAE — 300 AED","","data-value"],["Google Play UAE — 300 AED","","data-value"]],
+              ["honkai-star-rail.html","topups","honkai_star_rail_global","60_oneiric_shard",["60 Oneiric Shard (Global)","","data-value"],["60 Oneiric Shard (Global)","","data-value"]],
+              ["honkai-star-rail.html","topups","honkai_star_rail_global","300_30_oneiric_shard",["330 Oneiric Shard (Global)","","data-value"],["330 Oneiric Shard (Global)","","data-value"]],
+              ["honkai-star-rail.html","topups","honkai_star_rail_global","980_110_oneiric_shard",["1090 Oneiric Shard (Global)","","data-value"],["1090 Oneiric Shard (Global)","","data-value"]],
+              ["honkai-star-rail.html","topups","honkai_star_rail_global","1980_260_oneiric_shard",["2240 Oneiric Shard (Global)","","data-value"],["2240 Oneiric Shard (Global)","","data-value"]],
+              ["honkai-star-rail.html","topups","honkai_star_rail_global","3280_600_oneiric_shard",["3880 Oneiric Shard (Global)","","data-value"],["3880 Oneiric Shard (Global)","","data-value"]],
+              ["honkai-star-rail.html","topups","honkai_star_rail_global","6480_1600_oneiric_shard",["8080 Oneiric Shard (Global)","","data-value"],["8080 Oneiric Shard (Global)","","data-value"]],
+              ["honkai-star-rail.html","topups","honkai_star_rail_global","express_supply_pass",["Express Supply Pass (Global)","","data-value"],["Express Supply Pass (Global)","","data-value"]],
+              ["honor-of-kings.html","topups","honor_of_kings","80_tokens",["80 Tokens","","data-value"],["80 Tokens","","data-value"]],
+              ["kingshot.html","topups","kingshot","999_gold",["999 Gold","","data-value"],["999 Gold","","data-value"]],
+              ["kingshot.html","topups","kingshot","1999_gold",["1999 Gold","","data-value"],["1999 Gold","","data-value"]],
+              ["kingshot.html","topups","kingshot","4999_gold",["4999 Gold","","data-value"],["4999 Gold","","data-value"]],
+              ["kingshot.html","topups","kingshot","9999_gold",["9999 Gold","","data-value"],["9999 Gold","","data-value"]],
+              ["likee.html","topups","likee","100_diamonds",["100 Diamonds","","data-value"],["100 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","200_diamonds",["200 Diamonds","","data-value"],["200 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","500_diamonds",["500 Diamonds","","data-value"],["500 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","1000_diamonds",["1000 Diamonds","","data-value"],["1000 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","2000_diamonds",["2000 Diamonds","","data-value"],["2000 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","3000_diamonds",["3000 Diamonds","","data-value"],["3000 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","4000_diamonds",["4000 Diamonds","","data-value"],["4000 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","5000_diamonds",["5000 Diamonds","","data-value"],["5000 Diamonds","","data-value"]],
+              ["likee.html","topups","likee","10000_diamonds",["10000 Diamonds","","data-value"],["10000 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","395_diamonds",["395 Diamonds","","data-value"],["395 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","785_diamonds",["785 Diamonds","","data-value"],["785 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","1179_diamonds",["1179 Diamonds","","data-value"],["1179 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","1964_diamonds",["1964 Diamonds","","data-value"],["1964 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","3928_diamonds",["3928 Diamonds","","data-value"],["3928 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","7857_diamonds",["7857 Diamonds","","data-value"],["7857 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","11785_diamonds",["11785 Diamonds","","data-value"],["11785 Diamonds","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","weekly_diamond_pass",["Weekly Diamond Pass","","data-value"],["Weekly Diamond Pass","","data-value"]],
+              ["lords-mobile.html","topups","lords_mobile","monthly_diamond_pass",["Monthly Diamond Pass","","data-value"],["Monthly Diamond Pass","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","51_5_diamonds",["56 💎","","data-value"],["56 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","78_8_diamonds",["86 💎","","data-value"],["86 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","156_16_diamonds",["172 💎","","data-value"],["172 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","234_23_diamonds",["257 💎","","data-value"],["257 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","625_81_diamonds",["706 💎","","data-value"],["706 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","1860_335_diamonds",["2195 💎","","data-value"],["2195 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","3099_589_diamonds",["3688 💎","","data-value"],["3688 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","4649_883_diamonds",["5532 💎","","data-value"],["5532 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","7740_1548_diamonds",["9288 💎","","data-value"],["9288 💎","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","weekly_elite_pack",["Weekly Elite Pack","","data-value"],["Weekly Elite Pack","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","monthly_elite_pack",["Monthly Elite Pack","","data-value"],["Monthly Elite Pack","","data-value"]],
+              ["mobile-legends.html","topups","mobile_legends_global","twilight_pass",["Twilight Pass","","data-value"],["Twilight Pass","","data-value"]],
+              ["modern-strike-online.html","topups","modern_strike_online","10000_gold",["10,000 Gold","","data-price"],["10,000 Gold","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","16000_gold",["16,000 Gold","","data-price"],["16,000 Gold","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","35000_gold",["35,000 Gold","","data-price"],["35,000 Gold","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","60000_gold",["60,000 Gold","","data-price"],["60,000 Gold","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","300000_gold",["300,000 Gold","","data-price"],["300,000 Gold","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","10000_credits",["10,000 Credits","","data-price"],["10,000 Credits","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","25000_credits",["25,000 Credits","","data-price"],["25,000 Credits","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","55000_credits",["55,000 Credits","","data-price"],["55,000 Credits","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","100000_credits",["100,000 Credits","","data-price"],["100,000 Credits","","data-price"]],
+              ["modern-strike-online.html","topups","modern_strike_online","battle_pass_premium",["Battle Pass Premium","","data-price"],["Battle Pass Premium","","data-price"]],
+              ["netflix.html","gift_cards","netflix_us","15_usd",["Netflix Gift Card 15 USD (USA)","USA","data-value"],["Netflix Gift Card 15 USD (USA)","USA","data-value"]],
+              ["netflix.html","gift_cards","netflix_us","20_usd",["Netflix Gift Card 20 USD (USA)","USA","data-value"],["Netflix Gift Card 20 USD (USA)","USA","data-value"]],
+              ["netflix.html","gift_cards","netflix_us","25_usd",["Netflix Gift Card 25 USD (USA)","USA","data-value"],["Netflix Gift Card 25 USD (USA)","USA","data-value"]],
+              ["netflix.html","gift_cards","netflix_us","30_usd",["Netflix Gift Card 30 USD (USA)","USA","data-value"],["Netflix Gift Card 30 USD (USA)","USA","data-value"]],
+              ["netflix.html","gift_cards","netflix_us","50_usd",["Netflix Gift Card 50 USD (USA)","USA","data-value"],["Netflix Gift Card 50 USD (USA)","USA","data-value"]],
+              ["netflix.html","gift_cards","netflix_us","75_usd",["Netflix Gift Card 75 USD (USA)","USA","data-value"],["Netflix Gift Card 75 USD (USA)","USA","data-value"]],
+              ["netflix.html","gift_cards","netflix_us","100_usd",["Netflix Gift Card 100 USD (USA)","USA","data-value"],["Netflix Gift Card 100 USD (USA)","USA","data-value"]],
+              ["netflix.html","gift_cards","netflix_ae","100_aed",["Netflix Gift Card 100 AED (UAE)","UAE","data-value"],["Netflix Gift Card 100 AED (UAE)","UAE","data-value"]],
+              ["netflix.html","gift_cards","netflix_ae","150_aed",["Netflix Gift Card 150 AED (UAE)","UAE","data-value"],["Netflix Gift Card 150 AED (UAE)","UAE","data-value"]],
+              ["netflix.html","gift_cards","netflix_ae","200_aed",["Netflix Gift Card 200 AED (UAE)","UAE","data-value"],["Netflix Gift Card 200 AED (UAE)","UAE","data-value"]],
+              ["netflix.html","gift_cards","netflix_ae","250_aed",["Netflix Gift Card 250 AED (UAE)","UAE","data-value"],["Netflix Gift Card 250 AED (UAE)","UAE","data-value"]],
+              ["netflix.html","gift_cards","netflix_ae","300_aed",["Netflix Gift Card 300 AED (UAE)","UAE","data-value"],["Netflix Gift Card 300 AED (UAE)","UAE","data-value"]],
+              ["netflix.html","gift_cards","netflix_sa","100_sar",["Netflix Gift Card 100 SAR (SA)","SA","data-value"],["Netflix Gift Card 100 SAR (SA)","SA","data-value"]],
+              ["netflix.html","gift_cards","netflix_sa","200_sar",["Netflix Gift Card 200 SAR (SA)","SA","data-value"],["Netflix Gift Card 200 SAR (SA)","SA","data-value"]],
+              ["netflix.html","gift_cards","netflix_sa","250_sar",["Netflix Gift Card 250 SAR (SA)","SA","data-value"],["Netflix Gift Card 250 SAR (SA)","SA","data-value"]],
+              ["netflix.html","gift_cards","netflix_sa","300_sar",["Netflix Gift Card 300 SAR (SA)","SA","data-value"],["Netflix Gift Card 300 SAR (SA)","SA","data-value"]],
+              ["nintendo-eshop.html","gift_cards","nintendo_us","5_usd",["5 USD","","data-value"],["5 USD","","data-value"]],
+              ["nintendo-eshop.html","gift_cards","nintendo_us","10_usd",["10 USD","","data-value"],["10 USD","","data-value"]],
+              ["nintendo-eshop.html","gift_cards","nintendo_us","20_usd",["20 USD","","data-value"],["20 USD","","data-value"]],
+              ["nintendo-eshop.html","gift_cards","nintendo_us","35_usd",["35 USD","","data-value"],["35 USD","","data-value"]],
+              ["nintendo-eshop.html","gift_cards","nintendo_us","50_usd",["50 USD","","data-value"],["50 USD","","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","1_usd",["1 USD (USA)","USA","data-value"],["1 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","2_usd",["2 USD (USA)","USA","data-value"],["2 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","5_usd",["5 USD (USA)","USA","data-value"],["5 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","10_usd",["10 USD (USA)","USA","data-value"],["10 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","25_usd",["25 USD (USA)","USA","data-value"],["25 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","50_usd",["50 USD (USA)","USA","data-value"],["50 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","75_usd",["75 USD (USA)","USA","data-value"],["75 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_us","100_usd",["100 USD (USA)","USA","data-value"],["100 USD (USA)","USA","data-value"]],
+              ["playstation.html","gift_cards","playstation_ae","10_usd",["10 USD (UAE)","UAE","data-value"],["10 USD (UAE)","UAE","data-value"]],
+              ["playstation.html","gift_cards","playstation_ae","20_usd",["20 USD (UAE)","UAE","data-value"],["20 USD (UAE)","UAE","data-value"]],
+              ["playstation.html","gift_cards","playstation_ae","50_usd",["50 USD (UAE)","UAE","data-value"],["50 USD (UAE)","UAE","data-value"]],
+              ["playstation.html","gift_cards","playstation_ae","100_usd",["100 USD (UAE)","UAE","data-value"],["100 USD (UAE)","UAE","data-value"]],
+              ["playstation.html","gift_cards","playstation_ae","120_usd",["120 USD (UAE)","UAE","data-value"],["120 USD (UAE)","UAE","data-value"]],
+              ["playstation.html","gift_cards","playstation_fr","10_eur",["10 EUR (France)","FR","data-value"],["10 EUR (France)","FR","data-value"]],
+              ["playstation.html","gift_cards","playstation_fr","20_eur",["20 EUR (France)","FR","data-value"],["20 EUR (France)","FR","data-value"]],
+              ["playstation.html","gift_cards","playstation_fr","60_eur",["60 EUR (France)","FR","data-value"],["60 EUR (France)","FR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","250_try",["250 TRY (Turkey)","TR","data-value"],["250 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","500_try",["500 TRY (Turkey)","TR","data-value"],["500 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","750_try",["750 TRY (Turkey)","TR","data-value"],["750 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","1000_try",["1000 TRY (Turkey)","TR","data-value"],["1000 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","1500_try",["1500 TRY (Turkey)","TR","data-value"],["1500 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","2000_try",["2000 TRY (Turkey)","TR","data-value"],["2000 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","2500_try",["2500 TRY (Turkey)","TR","data-value"],["2500 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","3000_try",["3000 TRY (Turkey)","TR","data-value"],["3000 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","4000_try",["4000 TRY (Turkey)","TR","data-value"],["4000 TRY (Turkey)","TR","data-value"]],
+              ["playstation.html","gift_cards","playstation_tr","5000_try",["5000 TRY (Turkey)","TR","data-value"],["5000 TRY (Turkey)","TR","data-value"]],
+              ["poppo-live.html","topups","poppo_live","7000_coins",["7,000 Coins","","data-price"],["7,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","21000_coins",["21,000 Coins","","data-price"],["21,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","25500_coins",["25,500 Coins","","data-price"],["25,500 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","43500_coins",["43,500 Coins","","data-price"],["43,500 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","70000_coins",["70,000 Coins","","data-price"],["70,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","83000_coins",["83,000 Coins","","data-price"],["83,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","88990_coins",["88,990 Coins","","data-price"],["88,990 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","180000_coins",["180,000 Coins","","data-price"],["180,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","210000_coins",["210,000 Coins","","data-price"],["210,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","252000_coins",["252,000 Coins","","data-price"],["252,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","270000_coins",["270,000 Coins","","data-price"],["270,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","350000_coins",["350,000 Coins","","data-price"],["350,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","450000_coins",["450,000 Coins","","data-price"],["450,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","455000_coins",["455,000 Coins","","data-price"],["455,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","700000_coins",["700,000 Coins","","data-price"],["700,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","1050000_coins",["1,050,000 Coins","","data-price"],["1,050,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","1400000_coins",["1,400,000 Coins","","data-price"],["1,400,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","1750000_coins",["1,750,000 Coins","","data-price"],["1,750,000 Coins","","data-price"]],
+              ["poppo-live.html","topups","poppo_live","2100000_coins",["2,100,000 Coins","","data-price"],["2,100,000 Coins","","data-price"]],
+              ["razer-gold.html","gift_cards","razer_gold_global","1_usd",["Razer Gold Global — 1 USD","","data-value"],["Razer Gold Global — 1 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_global","2_usd",["Razer Gold Global — 2 USD","","data-value"],["Razer Gold Global — 2 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_global","5_usd",["Razer Gold Global — 5 USD","","data-value"],["Razer Gold Global — 5 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_global","10_usd",["Razer Gold Global — 10 USD","","data-value"],["Razer Gold Global — 10 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_global","20_usd",["Razer Gold Global — 20 USD","","data-value"],["Razer Gold Global — 20 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_global","50_usd",["Razer Gold Global — 50 USD","","data-value"],["Razer Gold Global — 50 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","1_usd",["Razer Gold USA — 1 USD","","data-value"],["Razer Gold USA — 1 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","2_usd",["Razer Gold USA — 2 USD","","data-value"],["Razer Gold USA — 2 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","5_usd",["Razer Gold USA — 5 USD","","data-value"],["Razer Gold USA — 5 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","10_usd",["Razer Gold USA — 10 USD","","data-value"],["Razer Gold USA — 10 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","20_usd",["Razer Gold USA — 20 USD","","data-value"],["Razer Gold USA — 20 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","25_usd",["Razer Gold USA — 25 USD","","data-value"],["Razer Gold USA — 25 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","50_usd",["Razer Gold USA — 50 USD","","data-value"],["Razer Gold USA — 50 USD","","data-value"]],
+              ["razer-gold.html","gift_cards","razer_gold_us","100_usd",["Razer Gold USA — 100 USD","","data-value"],["Razer Gold USA — 100 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","5_usd",["5 USD","","data-value"],["5 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","10_usd",["10 USD","","data-value"],["10 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","15_usd",["15 USD","","data-value"],["15 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","20_usd",["20 USD","","data-value"],["20 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","25_usd",["25 USD","","data-value"],["25 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","30_usd",["30 USD","","data-value"],["30 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","50_usd",["50 USD","","data-value"],["50 USD","","data-value"]],
+              ["rewarble.html","gift_cards","rewarble_usd","100_usd",["100 USD","","data-value"],["100 USD","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","50_robux",["50 Robux","","data-value"],["50 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","100_robux",["100 Robux","","data-value"],["100 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","500_robux",["500 Robux","","data-value"],["500 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","800_robux",["800 Robux","","data-value"],["800 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","1000_robux",["1000 Robux","","data-value"],["1000 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","1500_robux",["1500 Robux","","data-value"],["1500 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","2000_robux",["2000 Robux","","data-value"],["2000 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","2500_robux",["2500 Robux","","data-value"],["2500 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","3000_robux",["3000 Robux","","data-value"],["3000 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_global","4500_robux",["4500 Robux","","data-value"],["4500 Robux","","data-value"]],
+              ["roblox.html","gift_cards","roblox_us","10_usd",["Roblox USA 10 USD","","data-value"],["Roblox USA 10 USD","","data-value"]],
+              ["roblox.html","gift_cards","roblox_us","15_usd",["Roblox USA 15 USD","","data-value"],["Roblox USA 15 USD","","data-value"]],
+              ["roblox.html","gift_cards","roblox_us","20_usd",["Roblox USA 20 USD","","data-value"],["Roblox USA 20 USD","","data-value"]],
+              ["roblox.html","gift_cards","roblox_us","25_usd",["Roblox USA 25 USD","","data-value"],["Roblox USA 25 USD","","data-value"]],
+              ["roblox.html","gift_cards","roblox_us","30_usd",["Roblox USA 30 USD","","data-value"],["Roblox USA 30 USD","","data-value"]],
+              ["roblox.html","gift_cards","roblox_us","50_usd",["Roblox USA 50 USD","","data-value"],["Roblox USA 50 USD","","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_global","5_usd",["5 USD (Global)","GLOBAL","data-value"],["5 USD (Global)","GLOBAL","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_global","10_usd",["10 USD (Global)","GLOBAL","data-value"],["10 USD (Global)","GLOBAL","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_global","20_usd",["20 USD (Global)","GLOBAL","data-value"],["20 USD (Global)","GLOBAL","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_us","5_usd",["5 USD (USA)","USA","data-value"],["5 USD (USA)","USA","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_us","10_usd",["10 USD (USA)","USA","data-value"],["10 USD (USA)","USA","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_us","20_usd",["20 USD (USA)","USA","data-value"],["20 USD (USA)","USA","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_us","25_usd",["25 USD (USA)","USA","data-value"],["25 USD (USA)","USA","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_us","30_usd",["30 USD (USA)","USA","data-value"],["30 USD (USA)","USA","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_us","50_usd",["50 USD (USA)","USA","data-value"],["50 USD (USA)","USA","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_ae","20_aed",["20 AED (UAE)","UAE","data-value"],["20 AED (UAE)","UAE","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_ae","50_aed",["50 AED (UAE)","UAE","data-value"],["50 AED (UAE)","UAE","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_ae","100_aed",["100 AED (UAE)","UAE","data-value"],["100 AED (UAE)","UAE","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_ae","200_aed",["200 AED (UAE)","UAE","data-value"],["200 AED (UAE)","UAE","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_eu","20_eur",["20 EUR (Europe)","EU","data-value"],["20 EUR (Europe)","EU","data-value"]],
+              ["steam-wallet.html","gift_cards","steam_wallet_eu","30_eur",["30 EUR (Europe)","EU","data-value"],["30 EUR (Europe)","EU","data-value"]],
+              ["sugo.html","topups","sugo_online_chat_party","1200_coins",["1200 Coins","","data-value"],["1200 Coins","","data-value"]],
+              ["sugo.html","topups","sugo_online_chat_party","2400_coins",["2400 Coins","","data-value"],["2400 Coins","","data-value"]],
+              ["sugo.html","topups","sugo_online_chat_party","6250_coins",["6250 Coins","","data-value"],["6250 Coins","","data-value"]],
+              ["sugo.html","topups","sugo_online_chat_party","12500_coins",["12500 Coins","","data-value"],["12500 Coins","","data-value"]],
+              ["sugo.html","topups","sugo_online_chat_party","37500_coins",["37500 Coins","","data-value"],["37500 Coins","","data-value"]],
+              ["sugo.html","topups","sugo_online_chat_party","65000_coins",["65000 Coins","","data-value"],["65000 Coins","","data-value"]],
+              ["sugo.html","topups","sugo_online_chat_party","130000_coins",["130000 Coins","","data-value"],["130000 Coins","","data-value"]],
+              ["telegram.html","telegram_stars","","50",["Telegram Stars — 50 ⭐️","","data-value"],["Telegram Stars — 50 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","100",["Telegram Stars — 100 ⭐️","","data-value"],["Telegram Stars — 100 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","200",["Telegram Stars — 200 ⭐️","","data-value"],["Telegram Stars — 200 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","250",["Telegram Stars — 250 ⭐️","","data-value"],["Telegram Stars — 250 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","500",["Telegram Stars — 500 ⭐️","","data-value"],["Telegram Stars — 500 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","750",["Telegram Stars — 750 ⭐️","","data-value"],["Telegram Stars — 750 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","1000",["Telegram Stars — 1000 ⭐️","","data-value"],["Telegram Stars — 1000 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","1500",["Telegram Stars — 1500 ⭐️","","data-value"],["Telegram Stars — 1500 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","2000",["Telegram Stars — 2000 ⭐️","","data-value"],["Telegram Stars — 2000 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","3000",["Telegram Stars — 3000 ⭐️","","data-value"],["Telegram Stars — 3000 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","5000",["Telegram Stars — 5000 ⭐️","","data-value"],["Telegram Stars — 5000 ⭐️","","data-value"]],
+              ["telegram.html","telegram_stars","","10000",["Telegram Stars — 10000 ⭐️","","data-value"],["Telegram Stars — 10000 ⭐️","","data-value"]],
+              ["telegram.html","telegram_premium","","3",["Telegram Premium — 3 Mois","","data-value"],["Telegram Premium — 3 Mois","","data-value"]],
+              ["telegram.html","telegram_premium","","6",["Telegram Premium — 6 Mois","","data-value"],["Telegram Premium — 6 Mois","","data-value"]],
+              ["telegram.html","telegram_premium","","12",["Telegram Premium — 12 Mois","","data-value"],["Telegram Premium — 12 Mois","","data-value"]],
+              ["twitch.html","gift_cards","twitch_usd","10_usd",["10 USD","","data-value"],["10 USD","","data-value"]],
+              ["twitch.html","gift_cards","twitch_usd","15_usd",["15 USD","","data-value"],["15 USD","","data-value"]],
+              ["twitch.html","gift_cards","twitch_usd","20_usd",["20 USD","","data-value"],["20 USD","","data-value"]],
+              ["twitch.html","gift_cards","twitch_usd","25_usd",["25 USD","","data-value"],["25 USD","","data-value"]],
+              ["twitch.html","gift_cards","twitch_usd","50_usd",["50 USD","","data-value"],["50 USD","","data-value"]],
+              ["twitch.html","gift_cards","twitch_usd","100_usd",["100 USD","","data-value"],["100 USD","","data-value"]],
+              ["twitch.html","gift_cards","twitch_usd","200_usd",["200 USD","","data-value"],["200 USD","","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","240_vp",["240 VP (USA)","USA","data-value"],["240 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","325_vp",["325 VP (USA)","USA","data-value"],["325 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","475_vp",["475 VP (USA)","USA","data-value"],["475 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","1000_vp",["1000 VP (USA)","USA","data-value"],["1000 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","1520_vp",["1520 VP (USA)","USA","data-value"],["1520 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","2050_vp",["2050 VP (USA)","USA","data-value"],["2050 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","2575_vp",["2575 VP (USA)","USA","data-value"],["2575 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","3650_vp",["3650 VP (USA)","USA","data-value"],["3650 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","5350_vp",["5350 VP (USA)","USA","data-value"],["5350 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","8700_vp",["8700 VP (USA)","USA","data-value"],["8700 VP (USA)","USA","data-value"]],
+              ["valorant.html","gift_cards","valorant_us","11000_vp",["11000 VP (USA)","USA","data-value"],["11000 VP (USA)","USA","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","99_frost_stars",["99 Frost Stars","","data-value"],["99 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","299_frost_stars",["299 Frost Stars","","data-value"],["299 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","499_frost_stars",["499 Frost Stars","","data-value"],["499 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","999_frost_stars",["999 Frost Stars","","data-value"],["999 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","1999_frost_stars",["1999 Frost Stars","","data-value"],["1999 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","4999_frost_stars",["4999 Frost Stars","","data-value"],["4999 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","7499_frost_stars",["7499 Frost Stars","","data-value"],["7499 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","9999_frost_stars",["9999 Frost Stars","","data-value"],["9999 Frost Stars","","data-value"]],
+              ["whiteout-survival.html","topups","whiteout_survival","18495_frost_stars",["18495 Frost Stars","","data-value"],["18495 Frost Stars","","data-value"]],
+              ["xbox.html","gift_cards","xbox_us","5_usd",["Xbox Gift Card 5 USD (USA)","USA","data-value"],["Xbox Gift Card 5 USD (USA)","USA","data-value"]],
+              ["xbox.html","gift_cards","xbox_us","10_usd",["Xbox Gift Card 10 USD (USA)","USA","data-value"],["Xbox Gift Card 10 USD (USA)","USA","data-value"]],
+              ["xbox.html","gift_cards","xbox_us","15_usd",["Xbox Gift Card 15 USD (USA)","USA","data-value"],["Xbox Gift Card 15 USD (USA)","USA","data-value"]],
+              ["xbox.html","gift_cards","xbox_us","20_usd",["Xbox Gift Card 20 USD (USA)","USA","data-value"],["Xbox Gift Card 20 USD (USA)","USA","data-value"]],
+              ["xbox.html","gift_cards","xbox_us","25_usd",["Xbox Gift Card 25 USD (USA)","USA","data-value"],["Xbox Gift Card 25 USD (USA)","USA","data-value"]],
+              ["xbox.html","gift_cards","xbox_us","50_usd",["Xbox Gift Card 50 USD (USA)","USA","data-value"],["Xbox Gift Card 50 USD (USA)","USA","data-value"]],
+              ["xbox.html","gift_cards","xbox_us","100_usd",["Xbox Gift Card 100 USD (USA)","USA","data-value"],["Xbox Gift Card 100 USD (USA)","USA","data-value"]],
+              ["xbox.html","gift_cards","xbox_eu","5_eur",["Xbox Gift Card 5 EUR (Europe)","EU","data-value"],["Xbox Gift Card 5 EUR (Europe)","EU","data-value"]],
+              ["xbox.html","gift_cards","xbox_eu","20_eur",["Xbox Gift Card 20 EUR (Europe)","EU","data-value"],["Xbox Gift Card 20 EUR (Europe)","EU","data-value"]],
+              ["xbox.html","gift_cards","xbox_eu","50_eur",["Xbox Gift Card 50 EUR (Europe)","EU","data-value"],["Xbox Gift Card 50 EUR (Europe)","EU","data-value"]],
+              ["yalla-ludo.html","topups","yalla_ludo","68500_gold",["68,500 ذهب","","data-value"],["68,500 Gold","","data-value"]],
+              ["yalla-ludo.html","topups","yalla_ludo","223700_gold",["223,700 ذهب","","data-value"],["223,700 Gold","","data-value"]],
+              ["yalla-ludo.html","topups","yalla_ludo","1463320_gold",["1,463,320 ذهب","","data-value"],["1,463,320 Gold","","data-value"]],
+              ["yalla-ludo.html","topups","yalla_ludo","3666470_gold",["3,666,470 ذهب","","data-value"],["3,666,470 Gold","","data-value"]],
+              ["yalla-ludo.html","topups","yalla_ludo","9973990_gold",["9,973,990 ذهب","","data-value"],["9,973,990 Gold","","data-value"]],
+              ["yalla-ludo.html","topups","yalla_ludo","25236460_gold",["25,236,460 ذهب","","data-value"],["25,236,460 Gold","","data-value"]],
+              ["yoho.html","topups","yoho_group_voice_chat_room","7000_coins",["7,000 Coins","","data-value"],["7,000 Coins","","data-value"]],
+              ["yoho.html","topups","yoho_group_voice_chat_room","35000_coins",["35,000 Coins","","data-value"],["35,000 Coins","","data-value"]],
+              ["yoho.html","topups","yoho_group_voice_chat_room","70500_coins",["70,500 Coins","","data-value"],["70,500 Coins","","data-value"]],
+              ["yoho.html","topups","yoho_group_voice_chat_room","353000_coins",["353,000 Coins","","data-value"],["353,000 Coins","","data-value"]],
+              ["yoho.html","topups","yoho_group_voice_chat_room","708000_coins",["708,000 Coins","","data-value"],["708,000 Coins","","data-value"]],
+              ["zenless-zone-zero.html","topups","zenless_zone_zero_global","60_monochromes",["60 Monochromes (Global)","","data-value"],["60 Monochromes (Global)","","data-value"]],
+              ["zenless-zone-zero.html","topups","zenless_zone_zero_global","300_30_monochromes",["330 Monochromes (Global)","","data-value"],["330 Monochromes (Global)","","data-value"]],
+              ["zenless-zone-zero.html","topups","zenless_zone_zero_global","980_110_monochromes",["1,090 Monochromes (Global)","","data-value"],["1,090 Monochromes (Global)","","data-value"]],
+              ["zenless-zone-zero.html","topups","zenless_zone_zero_global","1980_260_monochromes",["2,240 Monochromes (Global)","","data-value"],["2,240 Monochromes (Global)","","data-value"]],
+              ["zenless-zone-zero.html","topups","zenless_zone_zero_global","3280_600_monochromes",["3,880 Monochromes (Global)","","data-value"],["3,880 Monochromes (Global)","","data-value"]],
+              ["zenless-zone-zero.html","topups","zenless_zone_zero_global","inter_knot_membership",["Inter-Knot Membership (Global)","","data-value"],["Inter-Knot Membership (Global)","","data-value"]],
+          ]
+
+          run(MAPPING, Path(os.environ["FAZER_PREVIEW_DIR"]))
+          PY
+
+      - name: Save pricing report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: fazercards-publish-report
+          path: ${{ runner.temp }}/fazer-price-preview/fazercards-price-preview.csv
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Stage site for publication
+        env:
+          FAZER_PREVIEW_DIR: ${{ runner.temp }}/fazer-price-preview
+          FAZER_PAGES_DIR: ${{ runner.temp }}/topupmorocco-pages
+        run: |
+          mkdir -p "$FAZER_PAGES_DIR"
+          git archive HEAD | tar -x -C "$FAZER_PAGES_DIR" --exclude=.github
+          python3 - <<'PY'
+          import csv
+          import os
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+
+          preview = Path(os.environ["FAZER_PREVIEW_DIR"])
+          site = Path(os.environ["FAZER_PAGES_DIR"])
+          with (preview / "fazercards-price-preview.csv").open(encoding="utf-8-sig", newline="") as stream:
+              rows = list(csv.DictReader(stream))
+          if not rows or any(row["Status"] != "OK" for row in rows):
+              raise SystemExit("Publication stopped: one or more offers could not be priced. See the report.")
+          expected = {
+              filename for row in rows
+              for filename, price in ((row["Page"], row["Old AR MAD"]), (f'fr/{row["Page"]}', row["Old FR MAD"]))
+              if row["New MAD"] != price
+          }
+          with ZipFile(preview / "topupmorocco-prices-preview.zip") as bundle:
+              files = bundle.namelist()
+              if len(files) != len(expected) or set(files) != expected or bundle.testzip() is not None:
+                  raise SystemExit("Publication stopped: preview files do not match the pricing report.")
+              for name in files:
+                  path = PurePosixPath(name)
+                  if path.is_absolute() or ".." in path.parts or path.suffix != ".html":
+                      raise SystemExit("Unexpected file in the pricing preview.")
+                  target = site / name
+                  if not target.is_file():
+                      raise SystemExit(f"Missing site path: {name}")
+                  target.write_bytes(bundle.read(name))
+          if not (site / "index.html").is_file():
+              raise SystemExit("Missing website home page.")
+          PY
+
+      - name: Upload site to GitHub Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/topupmorocco-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - name: Publish site
+        id: pages
+        uses: actions/deploy-pages@v4
