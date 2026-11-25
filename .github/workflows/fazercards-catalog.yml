@@ -1,0 +1,135 @@
+name: FazerCards - vérifier le catalogue
+
+on:
+  workflow_dispatch:
+    inputs:
+      search:
+        description: "Optional category search, e.g. Apple. Leave blank for all categories."
+        type: string
+        required: false
+
+permissions: {}
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Read FazerCards catalog
+        env:
+          FAZERCARDS_API_KEY: ${{ secrets.FAZERCARDS_API_KEY }}
+          CATEGORY_SEARCH: ${{ inputs.search }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlencode, quote
+          from urllib.request import Request, urlopen
+
+          base_url = "https://api.fzr.cards/api/v2"
+          api_key = os.environ.get("FAZERCARDS_API_KEY", "").strip()
+          search = os.environ.get("CATEGORY_SEARCH", "").strip().casefold()
+          if not api_key:
+              raise SystemExit("Missing repository secret FAZERCARDS_API_KEY.")
+
+          def read(path, **params):
+              url = base_url + path
+              if params:
+                  url += "?" + urlencode(params)
+              for attempt in range(3):
+                  try:
+                      request = Request(url, headers={"X-API-Key": api_key, "Accept": "application/json"})
+                      with urlopen(request, timeout=20) as response:
+                          result = json.load(response)
+                      if result.get("ok") is not True:
+                          raise RuntimeError(f"{path}: API did not return success")
+                      return result
+                  except HTTPError as error:
+                      if attempt == 2 or error.code not in {429, 500, 502, 503, 504}:
+                          raise RuntimeError(f"{path}: HTTP {error.code}") from None
+                      retry_after = error.headers.get("Retry-After", "")
+                      time.sleep(min(int(retry_after), 60) if retry_after.isdecimal() else 2 ** attempt)
+                  except (URLError, TimeoutError):
+                      if attempt == 2:
+                          raise RuntimeError(f"{path}: connection failed") from None
+                      time.sleep(2 ** attempt)
+
+          def categories(path, id_field):
+              rows, cursors = [], set()
+              params = {"limit": 50}
+              while True:
+                  result = read(path, **params)
+                  rows.extend({"id": row[id_field], "name": row["name"],
+                               **{field: row[field] for field in ("region", "platform") if field in row}}
+                              for row in result["items"])
+                  meta = result.get("meta", {})
+                  cursor = meta.get("next_cursor")
+                  if not meta.get("has_more") and not cursor:
+                      return rows
+                  if not cursor or cursor in cursors:
+                      raise RuntimeError(f"{path}: invalid pagination cursor")
+                  cursors.add(cursor)
+                  params["cursor"] = cursor
+
+          def offer_ids(path, rows_key, id_field, name_field="name", **params):
+              return [{"id": row[id_field], "name": row.get(name_field, "")}
+                      for row in read(path, **params)[rows_key]]
+
+          sources = {
+              "gift_cards": ("/giftcards", "category_id"),
+              "topups": ("/topups", "category_id"),
+              "game_keys": ("/gamekeys", "game_id"),
+              "manual_services": ("/manual-services", "id"),
+          }
+          offer_readers = {
+              "gift_cards": lambda id: offer_ids("/giftcards/cards", "offers", "card_id", category_id=id),
+              "topups": lambda id: offer_ids("/topups/offers", "offers", "offer_id", category_id=id),
+              "game_keys": lambda id: offer_ids("/gamekeys/keys", "keys", "key_id", game_id=id),
+              "manual_services": lambda id: offer_ids(f"/manual-services/{quote(str(id), safe='')}/offers", "items", "id"),
+          }
+          report = {"categories": {}, "checks": {}}
+          for name, (path, id_field) in sources.items():
+              try:
+                  rows = categories(path, id_field)
+                  matches = [row for row in rows if not search or search in row["name"].casefold()]
+                  report["categories"][name] = sorted(matches, key=lambda row: (row["name"].casefold(), str(row["id"])))
+                  report["checks"][name] = {"ok": True, "found": len(matches)}
+                  if search and len(matches) <= 20:
+                      for row in matches:
+                          try:
+                              row["offers"] = offer_readers[name](row["id"])
+                          except (RuntimeError, ValueError, KeyError, TypeError):
+                              row["offers_status"] = "Could not read offers"
+              except (RuntimeError, ValueError, KeyError, TypeError) as exc:
+                  report["checks"][name] = {"ok": False, "reason": str(exc) if isinstance(exc, RuntimeError) else "Unexpected API response"}
+
+          for path in ("/telegram/stars", "/telegram/premium", "/steam-topup/rates"):
+              try:
+                  read(path)
+                  report["checks"][path] = {"ok": True}
+              except (RuntimeError, ValueError, TypeError) as exc:
+                  report["checks"][path] = {"ok": False, "reason": str(exc) if isinstance(exc, RuntimeError) else "Unexpected API response"}
+
+          Path("fazercards-catalog.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("### FazerCards catalog check\n\n")
+              summary.write("| Catalog | Result |\n| --- | --- |\n")
+              for name, check in report["checks"].items():
+                  result = f'{check["found"]} categories' if "found" in check else ("OK" if check["ok"] else "Failed")
+                  summary.write(f"| {name} | {result} |\n")
+              summary.write("\nDownload the fazercards-catalog artifact for the identifiers and any errors.\n")
+          if not any(check["ok"] for check in report["checks"].values()):
+              raise SystemExit("No FazerCards catalog endpoint could be read.")
+          PY
+
+      - name: Upload catalog identifiers
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fazercards-catalog
+          path: fazercards-catalog.json
+          if-no-files-found: ignore
+          retention-days: 3
