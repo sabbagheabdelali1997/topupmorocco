@@ -60,6 +60,10 @@ jobs:
           }
 
 
+          class SupplierOfferMissing(ValueError):
+              pass
+
+
           def sell_price(usd):
               base = Decimal(str(usd)) * 11
               if not base.is_finite() or base <= 0:
@@ -115,8 +119,10 @@ jobs:
                   path, collection, id_field, category_param = SOURCES[kind]
                   rows = request(path, category, category_param)[collection]
                   matches = [item["price_usd"] for item in rows if str(item[id_field]) == offer]
+              if not matches:
+                  raise SupplierOfferMissing("Supplier offer missing")
               if len(matches) != 1:
-                  raise ValueError("Supplier offer missing or ambiguous")
+                  raise ValueError("Supplier offer ambiguous")
               return matches[0]
 
 
@@ -207,6 +213,8 @@ jobs:
                       changed.update(name for name in pending if pending[name] != files[name])
                       files.update(pending)
                       rows.append((page, ar[0], offer, *old_prices, new_price, "OK"))
+                  except SupplierOfferMissing:
+                      rows.append((page, ar[0], offer, "", "", "", "Supplier offer missing; repository price retained"))
                   except (KeyError, ValueError, ArithmeticError, FileNotFoundError) as exc:
                       detail = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
                       rows.append((page, ar[0], offer, "", "", "", detail))
@@ -218,12 +226,12 @@ jobs:
                   for name in sorted(changed):
                       archive.writestr(name, update_price_range(files[name]))
               success = sum(row[-1] == "OK" for row in rows)
+              retained = sum(row[-1] == "Supplier offer missing; repository price retained" for row in rows)
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
                   summary.write("### FazerCards price preview\n\n")
                   summary.write(f"- Offers priced: {success} / {len(rows)}\n- Pages with price changes: {len(changed)}\n")
-                  summary.write("- Download the artifact for the full report and preview HTML.\n")
-              if not success:
-                  raise SystemExit("No offer could be priced.")
+                  summary.write(f"- Offers using repository prices: {retained}\n")
+                  summary.write("- Download the artifact for the full report.\n")
 
 
           MAPPING = [
@@ -785,10 +793,13 @@ jobs:
           site = Path(os.environ["FAZER_PAGES_DIR"])
           with (preview / "fazercards-price-preview.csv").open(encoding="utf-8-sig", newline="") as stream:
               rows = list(csv.DictReader(stream))
-          if not rows or any(row["Status"] != "OK" for row in rows):
+          priced = [row for row in rows if row["Status"] == "OK"]
+          if not rows or any(
+              row["Status"] not in {"OK", "Supplier offer missing; repository price retained"} for row in rows
+          ):
               raise SystemExit("Publication stopped: one or more offers could not be priced. See the report.")
           expected = {
-              filename for row in rows
+              filename for row in priced
               for filename, price in ((row["Page"], row["Old AR MAD"]), (f'fr/{row["Page"]}', row["Old FR MAD"]))
               if row["New MAD"] != price
           }
